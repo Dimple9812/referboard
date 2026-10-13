@@ -142,6 +142,19 @@ class AuthFlowIT {
     }
 
     @Test
+    void proUsersGetTheProRoleInTheirToken() throws Exception {
+        String email = "pro-" + UUID.randomUUID() + "@example.com";
+        post("/api/auth/signup", Map.of("email", email, "password", "Passw0rdOK", "fullName", "Pro"), null);
+        jdbc.update("update users set role = 'PRO' where email = ?", email);
+        ResponseEntity<String> login = post("/api/auth/login", Map.of("email", email, "password", "Passw0rdOK"), null);
+        assertThat(login.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String token = new com.fasterxml.jackson.databind.ObjectMapper().readTree(login.getBody())
+                .get("accessToken").asText();
+        String payload = new String(java.util.Base64.getUrlDecoder().decode(token.split("\\.")[1]));
+        assertThat(payload).contains("\"roles\":[\"PRO\"]");
+    }
+
+    @Test
     void accountLocksAfterRepeatedFailures() {
         String email = "lock-" + UUID.randomUUID() + "@example.com";
         post("/api/auth/signup", Map.of("email", email, "password", "Passw0rdOK", "fullName", "Lock"), null);

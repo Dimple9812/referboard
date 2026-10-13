@@ -29,7 +29,8 @@ public class User {
 
     public enum AuthProvider { LOCAL, GOOGLE }
 
-    public enum Role { USER, ADMIN }
+    /** PRO = paid plan (e.g. unlimited JD analyses). */
+    public enum Role { USER, PRO, ADMIN }
 
     public enum Status { ACTIVE, DISABLED }
 

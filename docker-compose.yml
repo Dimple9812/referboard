@@ -213,6 +213,31 @@ services:
       job-service: { condition: service_started }
       profile-service: { condition: service_started }
 
+  resume-analyzer-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args: { MODULE: services/resume-analyzer-service }
+    ports: ["8086:8086"]
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/referboard?currentSchema=analyzer,public
+      DB_USERNAME: ${ANALYZER_DB_USERNAME:-analyzer_svc}
+      DB_PASSWORD: ${ANALYZER_DB_PASSWORD:-analyzer_svc}
+      # JD parsing and rewrites with Claude if a key is set; heuristics and rule-based suggestions otherwise.
+      LLM_PROVIDER: ${LLM_PROVIDER:-auto}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-auto}
+      ANALYZER_FREE_PER_MONTH: ${ANALYZER_FREE_PER_MONTH:-5}
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+      job-service: { condition: service_started }
+      profile-service: { condition: service_started }
+
   tracker-service:
     build:
       context: .

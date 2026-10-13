@@ -32,10 +32,10 @@ flowchart LR
 | ingestion-service | ✅ | 54 unit + 2 integration (4 simulated runs over 61 days against mock ATS APIs; force-republish) |
 | job-service | ✅ | 5 unit + 4 integration (events → FTS/trigram/pgvector search, Redis cache, matches, DLT, digest) |
 | referral-service | ✅ | 34 unit + 5 integration (Feign → mock job/profile/Claude APIs, draft guard, pipeline events, reminders on a movable clock) |
-| resume-analyzer-service | ⏳ next | |
+| resume-analyzer-service | ✅ | 28 unit + 7 integration (LLM + heuristic paths, truth guard, tailored DOCX/PDF, free-tier limit, JD cache) |
 | tracker-service | ✅ | 7 unit + 6 integration (board API, drag-and-drop ordering, referral/resume/closed-job events, create race) |
 | notification-service | ✅ | 5 unit + 6 integration (real SMTP via GreenMail: escaping, outage + retry, one-click unsubscribe, daily cap, dedup) |
-| api-gateway | ⏳ | |
+| api-gateway | ⏳ next | |
 | frontend | ⏳ | |
 
 ## Run locally with Docker
@@ -55,6 +55,7 @@ docker compose --profile tools up kafka-ui   # optional Kafka UI on :8090
 | http://localhost:8083/swagger-ui.html | job-service API docs (search, detail + match breakdown, recommendations) |
 | http://localhost:8084/swagger-ui.html | ingestion admin API (ADMIN role) |
 | http://localhost:8085/swagger-ui.html | referral-service API docs (people to reach, drafts, CRM, reminders) |
+| http://localhost:8086/swagger-ui.html | resume-analyzer-service API docs (JD Match Analyzer, tailored resumes) |
 | http://localhost:8087/swagger-ui.html | tracker-service API docs (application board) |
 | http://localhost:8088/swagger-ui.html | notification-service API docs (inbox, email preferences) |
 | http://localhost:8025 | Mailpit: every email the app sends locally |
@@ -150,6 +151,39 @@ and publishes `referral.status-changed.v1`. Two reminders are scheduled automati
 still in that status: *connected 2 days ago → send your referral message* and *no reply 5 days after asking → follow
 up* (`referral.reminder-due.v1`, with a drafted message; notification-service will email them). Tune with
 `REFERRAL_SEND_REFERRAL_AFTER` / `REFERRAL_FOLLOW_UP_AFTER` (ISO-8601 durations).
+
+## How the JD Match Analyzer works
+
+`POST /api/analyses` with pasted `jdText`, or a ReferBoard `jobId`, or `POST /api/analyses/upload` with a PDF, DOCX
+or TXT. By default your primary uploaded resume is compared; pass `resume: {source: "PROFILE_RESUME"|"VERSION", id}`
+to pick another resume or a tailored version.
+
+1. **Read the JD.** Tika (files) or jsoup (job HTML) gives text, which is parsed by the LLM under a strict JSON
+   schema, or by a heuristic parser (section headings, the shared skills taxonomy, "N+ years") without a key. Any
+   skill the LLM reports that the text never mentions is dropped. Parses are cached by content hash, so the same
+   posting is never sent to the LLM twice.
+2. **Score (0–100).** Required skills 40, preferred 15, experience and seniority 15, responsibilities similarity
+   (embeddings) 15, keywords and ATS 10, education 5. A skill used in a role counts fully, one only listed counts
+   0.6. Components the posting says nothing about are left out and the rest rescaled, so a JD's silence never costs
+   points. Verdict: STRONG ≥ 80, GOOD ≥ 65, PARTIAL ≥ 45, else WEAK.
+3. **Report.** Matched skills with where they were used, missing skills (required / preferred / listed but never
+   shown in a role), and ATS checks: readable text, contact details, standard headings, length (real page count for
+   PDF/DOCX), title wording, keyword coverage, dated roles, quantified bullets, and skills written differently from
+   the posting ("K8s" vs "Kubernetes").
+4. **Suggestions, prioritised.** Skills order, posting's skill wording, a summary from your facts, bullet rewrites
+   (AI), gap and seniority advice. Each applicable suggestion shows its **measured impact** (the score is recomputed
+   with only that change); suggestions that would lower the score are not shown. `projectedScore` is the score with
+   every safe suggestion accepted.
+5. **Truthfulness.** Rewrites may rephrase and reorder, never add facts: an AI rewrite containing a number the
+   original doesn't is discarded, and any edit that names a skill the original didn't (including "add gRPC to your
+   skills") is labelled **"Add only if you have this experience"** and is refused unless you confirm it.
+6. **Tailored resume.** `POST /api/analyses/{id}/resume` with your accept/reject decisions (and confirmations)
+   creates a version linked to the job, publishes `resume.version-created.v1` (the tracker attaches it to the
+   job's card), and `GET /api/resume-versions/{id}/file?format=DOCX|PDF` renders an ATS-friendly single-column file.
+
+Free users get `ANALYZER_FREE_PER_MONTH` analyses (default 5); re-running the same JD against the same resume
+within 24 hours returns the stored report without counting. Users with the `PRO` or `ADMIN` role are unlimited
+(`update auth.users set role = 'PRO' where email = ...` until payments arrive in Phase 3).
 
 ## How the application tracker works
 

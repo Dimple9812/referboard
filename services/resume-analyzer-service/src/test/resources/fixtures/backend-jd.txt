@@ -1,0 +1,28 @@
+Senior Backend Engineer (Payments)
+Northwind Payments · Bengaluru (Hybrid)
+
+About us
+Northwind Payments moves money for 4,000 merchants across India. We are a 120-person fintech.
+
+What you'll do
+- Design and build high-throughput payment services in Java and Spring Boot
+- Own event-driven microservices on Kafka, from design to on-call
+- Improve reliability and low latency of the settlement platform
+- Mentor engineers and lead code review
+- Work with product and risk teams on new payment flows
+
+Requirements
+- 5+ years of backend development experience
+- Strong Java and Spring Boot
+- Production experience with Kafka and PostgreSQL
+- Kubernetes and Docker
+- gRPC or REST API design
+- B.Tech / B.E. in Computer Science or equivalent experience
+
+Nice to have
+- Go
+- AWS
+- Terraform
+
+Benefits
+- Health insurance for family, ESOPs, learning budget of 50,000 per year

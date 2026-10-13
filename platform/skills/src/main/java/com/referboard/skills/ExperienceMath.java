@@ -1,4 +1,4 @@
-package com.referboard.profile.service;
+package com.referboard.skills;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

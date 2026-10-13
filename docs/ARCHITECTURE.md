@@ -133,7 +133,7 @@ processed_events (event_id uuid pk, topic, processed_at)
 users (
   id uuid pk, email varchar(320), password_hash varchar(100) null,  -- null for Google-only accounts
   full_name, avatar_url, auth_provider ('LOCAL'|'GOOGLE'), google_subject null,
-  email_verified bool, role ('USER'|'ADMIN'), status ('ACTIVE'|'DISABLED'),
+  email_verified bool, role ('USER'|'PRO'|'ADMIN'), status ('ACTIVE'|'DISABLED'),
   failed_login_attempts int, locked_until, last_login_at,
   created_at, updated_at, deleted_at, version)
   unique (lower(email)) where deleted_at is null
@@ -341,29 +341,51 @@ Implementation notes:
   only if the contact is still in `trigger_status`, stores the drafted message as a draft, and publishes
   `ReferralReminderDue`.
 
-### 4.6 `analyzer` — resume-analyzer-service
+### 4.6 `analyzer` — resume-analyzer-service ✅ implemented
 
 ```sql
-parsed_jds (content_hash varchar(64) pk, parsed jsonb, model, prompt_version, hit_count, created_at)
-           -- cache: identical JD text never hits the LLM twice
+parsed_jds (content_hash varchar(64) pk, parser ('LLM'|'HEURISTIC'), model, prompt_version, parsed jsonb,
+  hit_count, created_at, last_used_at)
+  -- identical JD text (normalised, case-insensitive) never hits the LLM twice; a HEURISTIC entry is upgraded
+  -- once an LLM is configured, and a prompt_version bump re-parses
 
-resume_versions (id, user_id, name, job_id null, base_resume_id, source_analysis_id null,
+jd_analyses (id, user_id, job_id null, job_title, company_name, jd_source ('TEXT'|'UPLOAD'|'JOB'), jd_hash,
+  jd_text, resume_source ('PROFILE_RESUME'|'VERSION'), resume_ref_id, resume_name,
+  score smallint, verdict ('STRONG'|'GOOD'|'PARTIAL'|'WEAK'), projected_score smallint,
+  report jsonb,                                   -- exactly what the API returned: breakdown, skills, ATS, suggestions
+  resume_content jsonb,                           -- the snapshot suggestions apply to
+  created_at, deleted_at)
+  index (user_id, created_at desc); index (user_id, job_id); index (user_id, jd_hash, resume_ref_id, created_at desc)
+
+resume_versions (id, user_id, name, job_id null, analysis_id fk null, base_source, base_ref_id,
   content jsonb,                                  -- structured resume after accepted suggestions
-  file_format ('DOCX'|'PDF'), storage_key, created_at, deleted_at)
-  index (user_id, created_at desc)
+  accepted_suggestions jsonb, file_format ('DOCX'|'PDF'), score_before, score_after, created_at, deleted_at)
+  -- files are rendered from content on download (either format); nothing binary is stored
 
-jd_analyses (
-  id, user_id, job_id null, jd_text, jd_hash, parsed_jd jsonb,
-  resume_version_id null, resume_source ('PROFILE_RESUME'|'UPLOAD'|'VERSION'), resume_ref_id,
-  score smallint, verdict ('STRONG'|'GOOD'|'PARTIAL'|'WEAK'),
-  breakdown jsonb,                                -- per-component score + weight
-  matched jsonb, missing jsonb, ats_checks jsonb,
-  suggestions jsonb, accepted_suggestions jsonb, projected_score smallint,
-  created_at)
-  index (user_id, created_at desc); index (user_id, job_id)
+usage_counters (user_id, period char(7) /* YYYY-MM UTC */, analyses int, pk (user_id, period))
 
-usage_counters (user_id, period char(7) /* YYYY-MM */, analyses int, pk (user_id, period))
+outbox_events, processed_events
 ```
+
+Implementation notes:
+
+- **Pipeline:** `JdText` (Tika / jsoup → normalised lines) → `JdParserService` (LLM with forced schema, grounded
+  against the text; else `HeuristicJdParser`; cached) → `ResumeLoader` (profile-service parsed resume + extracted
+  text + page count via Feign, or a stored version) → `MatchScorer` → `SuggestionEngine` → impact by re-scoring →
+  stored report.
+- **Scoring is deterministic** for a given resume, JD and embedding model; that is what makes per-suggestion impact
+  and the projected score honest. Impacts compare like with like (both sides scored on the rendered resume text),
+  with a per-analysis embedding cache so only changed bullets are re-embedded.
+- **Truth guard:** AI rewrites with any number not in the original are discarded; placeholders discarded; skills
+  not in the original mark the suggestion `requiresConfirmation` ("Add only if you have this experience"), and
+  generation refuses unconfirmed claims (400 `CONFIRMATION_REQUIRED`). The model's copy of the "before" text is
+  never trusted; it's taken from the resume by index.
+- **Usage limit** is an atomic `insert … on conflict do update … where analyses < limit returning`, so concurrent
+  requests can't exceed it; a failed analysis gives its unit back.
+- **Rendering:** POI (DOCX) and OpenPDF (PDF, standard Helvetica, Windows-1252 text) — one column, real text,
+  plain headings and bullets, no tables, text boxes or images.
+- `ExperienceMath` (years from dated roles, overlaps merged) moved to the shared `skills` module so profile-service
+  and the analyzer compute experience identically.
 
 ### 4.7 `tracker` — tracker-service ✅ implemented
 
@@ -455,7 +477,7 @@ Source: `platform/event-contracts`. Every payload embeds `metadata`:
 | Topic | Producer → Consumers | Key | Payload (besides `metadata`) |
 |---|---|---|---|
 | `user.registered.v1` (compacted, unlimited retention) | auth → notification | userId | userId, email, fullName, authProvider |
-| `profile.updated.v1` | profile → job, analyzer | userId | userId, profileVersion, headline, skills[], totalExperienceYears, college, pastCompanies[], preferences{roles[], locations[], remoteOnly, openToRemote, minSalaryInr, experienceLevel}, embedding[], embeddingModel, embeddingDimensions |
+| `profile.updated.v1` | profile → job | userId | userId, profileVersion, headline, skills[], totalExperienceYears, college, pastCompanies[], preferences{roles[], locations[], remoteOnly, openToRemote, minSalaryInr, experienceLevel}, embedding[], embeddingModel, embeddingDimensions |
 | `job.upserted.v1` | ingestion → job | jobId | jobId, dedupKey, source, sourceJobId, companyName, companySlug, title, normalizedTitle, location, country, remote, employmentType, seniority, departmentName, descriptionHtml, descriptionText, applyUrl, salaryMin/Max/Currency, postedAt, firstSeenAt, lastSeenAt, skills[], embedding[], embeddingModel, ghostJobSuspected, contentHash |
 | `job.closed.v1` | ingestion → job, tracker | jobId | jobId, closedAt, reason (`UNSEEN_7_DAYS`) |
 | `match.daily-digest.v1` | job → notification | userId | userId, digestDate, matches[≤10]{jobId, title, companyName, location, remote, matchPercent, matchedSkills[]} |

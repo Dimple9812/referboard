@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "company", "seniority", "minYears", "maxYears", "requiredSkills", "preferredSkills",
+               "responsibilities", "keywords", "education", "location", "remote"],
+  "properties": {
+    "title": {"type": ["string", "null"]},
+    "company": {"type": ["string", "null"]},
+    "seniority": {"type": ["string", "null"],
+                  "enum": ["INTERN", "JUNIOR", "MID", "SENIOR", "LEAD", "STAFF", "MANAGER", "PRINCIPAL", "DIRECTOR", null]},
+    "minYears": {"type": ["integer", "null"]},
+    "maxYears": {"type": ["integer", "null"]},
+    "requiredSkills": {"type": "array", "items": {"type": "string"}},
+    "preferredSkills": {"type": "array", "items": {"type": "string"}},
+    "responsibilities": {"type": "array", "items": {"type": "string"}},
+    "keywords": {"type": "array", "items": {"type": "string"}},
+    "education": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "fields", "mandatory"],
+      "properties": {
+        "level": {"type": "string", "enum": ["NONE", "DIPLOMA", "BACHELORS", "MASTERS", "PHD"]},
+        "fields": {"type": "array", "items": {"type": "string"}},
+        "mandatory": {"type": "boolean"}
+      }
+    },
+    "location": {"type": ["string", "null"]},
+    "remote": {"type": ["boolean", "null"]}
+  }
+}

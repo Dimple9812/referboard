@@ -1,0 +1,107 @@
+server:
+  port: ${PORT:8086}
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+spring:
+  application:
+    name: resume-analyzer-service
+  threads:
+    virtual:
+      enabled: true
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/referboard?currentSchema=analyzer,public}
+    username: ${DB_USERNAME:analyzer_svc}
+    password: ${DB_PASSWORD:analyzer_svc}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: analyzer
+        jdbc.time_zone: UTC
+  flyway:
+    schemas: analyzer
+    default-schema: analyzer
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        delivery.timeout.ms: 15000
+        request.timeout.ms: 10000
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: 3000
+            read-timeout: 10000
+
+eureka:
+  client:
+    enabled: ${EUREKA_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+referboard:
+  security:
+    jwt:
+      jwk-set-uri: ${JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+      issuer: ${JWT_ISSUER:referboard-auth}
+      audience: ${JWT_AUDIENCE:referboard}
+  ai:
+    llm:
+      provider: ${LLM_PROVIDER:auto}
+      anthropic:
+        api-key: ${ANTHROPIC_API_KEY:}
+        model: ${ANTHROPIC_MODEL:claude-sonnet-5-5}
+      openai:
+        api-key: ${OPENAI_API_KEY:}
+        model: ${OPENAI_MODEL:gpt-4.1-mini}
+    embedding:
+      # Responsibilities-vs-experience similarity. auto = OpenAI if OPENAI_API_KEY is set, else hashing (lexical).
+      provider: ${EMBEDDING_PROVIDER:auto}
+      model: ${EMBEDDING_MODEL:text-embedding-3-small}
+      dimensions: 1536
+      api-key: ${OPENAI_API_KEY:}
+  clients:
+    # Empty = resolve through Eureka (lb://). Set a URL to call a service directly (local runs, tests).
+    job-service-url: ${JOB_SERVICE_URL:}
+    profile-service-url: ${PROFILE_SERVICE_URL:}
+  analyzer:
+    free-analyses-per-month: ${ANALYZER_FREE_PER_MONTH:5}   # PRO/ADMIN roles are unlimited
+    min-jd-chars: 200
+    max-jd-chars: 30000
+    max-upload-bytes: 2097152
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    correlation: "[%X{correlationId:-}] "
