@@ -32,9 +32,9 @@ flowchart LR
 | ingestion-service | ✅ | 54 unit + 2 integration (4 simulated runs over 61 days against mock ATS APIs; force-republish) |
 | job-service | ✅ | 5 unit + 4 integration (events → FTS/trigram/pgvector search, Redis cache, matches, DLT, digest) |
 | referral-service | ✅ | 34 unit + 5 integration (Feign → mock job/profile/Claude APIs, draft guard, pipeline events, reminders on a movable clock) |
-| resume-analyzer-service | ⏳ | |
+| resume-analyzer-service | ⏳ next | |
 | tracker-service | ✅ | 7 unit + 6 integration (board API, drag-and-drop ordering, referral/resume/closed-job events, create race) |
-| notification-service | ⏳ next | |
+| notification-service | ✅ | 5 unit + 6 integration (real SMTP via GreenMail: escaping, outage + retry, one-click unsubscribe, daily cap, dedup) |
 | api-gateway | ⏳ | |
 | frontend | ⏳ | |
 
@@ -56,6 +56,8 @@ docker compose --profile tools up kafka-ui   # optional Kafka UI on :8090
 | http://localhost:8084/swagger-ui.html | ingestion admin API (ADMIN role) |
 | http://localhost:8085/swagger-ui.html | referral-service API docs (people to reach, drafts, CRM, reminders) |
 | http://localhost:8087/swagger-ui.html | tracker-service API docs (application board) |
+| http://localhost:8088/swagger-ui.html | notification-service API docs (inbox, email preferences) |
+| http://localhost:8025 | Mailpit: every email the app sends locally |
 
 Try it:
 
@@ -168,6 +170,29 @@ The board also updates itself from other services' events:
 | job posting closed | the card is flagged "posting closed" |
 
 Every column change publishes `application.status-changed.v1`.
+
+## How notifications work
+
+notification-service turns events into in-app notifications (`GET /api/notifications`, `GET
+/api/notifications/unread-count` for the bell) and, where the user allows it, emails:
+
+| Event | In-app | Email |
+|---|---|---|
+| `user.registered.v1` | welcome | — (stores the address and default preferences) |
+| `referral.reminder-due.v1` | "Send your referral message to …" / "Follow up with …", linking to the contact | yes, with the drafted message to copy and send yourself |
+| `match.daily-digest.v1` (08:00 IST from job-service) | "N new job matches for you" | yes: the top matches with match %, matched skills and links |
+
+- Each reminder and each digest date produces at most one notification and one email, even if an event is
+  redelivered or re-published.
+- Emails are queued in the same transaction as the notification and sent by a background worker. An SMTP outage
+  never blocks event processing: sends are retried at 1, 4, 16 and 64 minutes, then marked failed. Without
+  `SMTP_HOST` emails are stored as skipped instead of sent.
+- Users switch reminder or digest emails off in settings (`PUT /api/notifications/preferences`) or with the link in
+  every email, which works without logging in and supports one-click unsubscribe (`List-Unsubscribe-Post`, as
+  Gmail and Yahoo require for bulk senders). At most `MAX_EMAILS_PER_USER_PER_DAY` (default 20) emails per user per
+  day.
+- `user.registered.v1` is a compacted topic with unlimited retention (declared by auth-service), so a newly
+  deployed notification-service still learns every user's address by reading it from the beginning.
 
 ## Adding skills to the taxonomy
 

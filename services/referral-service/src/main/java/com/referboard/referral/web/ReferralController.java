@@ -50,9 +50,11 @@ public class ReferralController {
     private final ContactService contacts;
     private final DraftService drafts;
     private final ReminderService reminders;
+    private final com.referboard.referral.service.SnapshotService snapshots;
 
     public ReferralController(SuggestionService suggestions, ContactService contacts, DraftService drafts,
-                              ReminderService reminders) {
+                              ReminderService reminders, com.referboard.referral.service.SnapshotService snapshots) {
+        this.snapshots = snapshots;
         this.suggestions = suggestions;
         this.contacts = contacts;
         this.drafts = drafts;
@@ -107,6 +109,10 @@ public class ReferralController {
     @PostMapping("/contacts/{id}/status")
     @Operation(summary = "Record what you did: REQUEST_SENT, CONNECTED, REFERRAL_ASKED, REFERRED or NO_RESPONSE")
     public ContactResponse changeStatus(@PathVariable UUID id, @Valid @RequestBody ChangeStatusRequest request) {
+        if (request.status() == ContactStatus.CONNECTED || request.status() == ContactStatus.REFERRAL_ASKED) {
+            // These schedule reminders, which are drafted later without a user token: keep the profile copy fresh.
+            snapshots.refreshUserQuietly(CurrentUser.id());
+        }
         return contacts.changeStatus(CurrentUser.id(), id, request.status());
     }
 

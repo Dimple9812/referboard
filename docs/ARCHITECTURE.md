@@ -407,20 +407,41 @@ Implementation notes:
 - `ReferralStatusChanged` carries the job's title, company, location and link (an additive contract change) because
   a consumer has no user token to call job-service.
 
-### 4.8 `notification` — notification-service
+### 4.8 `notification` — notification-service ✅ implemented
 
 ```sql
-recipients (user_id pk, email, full_name, email_opt_in bool, digest_enabled bool,
-  timezone default 'Asia/Kolkata', created_at, updated_at)       -- filled from UserRegistered
+recipients (user_id pk, email, full_name, created_at, updated_at)        -- from UserRegistered
 
-notifications (id, user_id, type, title, body, link, data jsonb, read_at, created_at)
-  index (user_id, created_at desc); index (user_id) where read_at is null
+notification_preferences (user_id pk, email_reminders bool, email_digest bool,
+  unsubscribe_token uuid unique, updated_at)
 
-email_deliveries (id, user_id, notification_id null, template, to_address, subject,
-  provider, provider_message_id, status ('QUEUED'|'SENT'|'FAILED'), attempts, last_error,
-  dedup_key unique,                               -- e.g. digest:{userId}:{date} — never double-send
-  created_at, sent_at)
+notifications (id, user_id, type ('REFERRAL_REMINDER'|'DAILY_DIGEST'|'WELCOME'|'SYSTEM'), title, body,
+  link /* app path */, data jsonb, dedup_key, read_at, created_at, deleted_at)
+  unique (user_id, dedup_key)                     -- reminder:{id}, digest:{date}, welcome
+  index (user_id, created_at desc) where deleted_at is null; index (user_id) where unread
+
+email_deliveries (id, user_id, notification_id fk, template, to_address, subject, html_body, text_body,
+  unsubscribe_url, status ('QUEUED'|'SENT'|'FAILED'|'SKIPPED'), skip_reason /* OPTED_OUT, DAILY_LIMIT,
+  MAIL_NOT_CONFIGURED */, attempts, next_attempt_at, last_error, created_at, sent_at)
+  index (next_attempt_at) where status = 'QUEUED'
+
+processed_events
 ```
+
+Implementation notes:
+
+- **Consume only.** The service publishes nothing, so it runs with `referboard.outbox.relay-enabled=false`
+  and has no outbox table.
+- **Idempotent twice over:** consumers record the event id, and notifications are inserted with
+  `on conflict (user_id, dedup_key) do nothing`; an email is queued only when the notification is new.
+- **Transactional email queue:** `NotificationWriter` renders the email and stores it with the notification in
+  one transaction; `EmailSender` locks due rows (`FOR UPDATE SKIP LOCKED`), sends multipart text + HTML over SMTP
+  with `List-Unsubscribe` / `List-Unsubscribe-Post` headers, and retries with 4× backoff up to 5 attempts.
+- **Templates** are plain Java with every user- or event-supplied value HTML-escaped (contact names, job titles and
+  drafted messages come from users) and a text alternative. Subjects are stripped of line breaks.
+- **Security:** everything needs a JWT except `GET|POST /api/notifications/unsubscribe`, authorised by the
+  per-user random token in the link.
+- Mail health is excluded from readiness: an SMTP outage queues mail, it doesn't take the service down.
 
 ## 5. Kafka event contracts
 
@@ -433,7 +454,7 @@ Source: `platform/event-contracts`. Every payload embeds `metadata`:
 
 | Topic | Producer → Consumers | Key | Payload (besides `metadata`) |
 |---|---|---|---|
-| `user.registered.v1` | auth → notification | userId | userId, email, fullName, authProvider |
+| `user.registered.v1` (compacted, unlimited retention) | auth → notification | userId | userId, email, fullName, authProvider |
 | `profile.updated.v1` | profile → job, analyzer | userId | userId, profileVersion, headline, skills[], totalExperienceYears, college, pastCompanies[], preferences{roles[], locations[], remoteOnly, openToRemote, minSalaryInr, experienceLevel}, embedding[], embeddingModel, embeddingDimensions |
 | `job.upserted.v1` | ingestion → job | jobId | jobId, dedupKey, source, sourceJobId, companyName, companySlug, title, normalizedTitle, location, country, remote, employmentType, seniority, departmentName, descriptionHtml, descriptionText, applyUrl, salaryMin/Max/Currency, postedAt, firstSeenAt, lastSeenAt, skills[], embedding[], embeddingModel, ghostJobSuspected, contentHash |
 | `job.closed.v1` | ingestion → job, tracker | jobId | jobId, closedAt, reason (`UNSEEN_7_DAYS`) |
@@ -441,7 +462,7 @@ Source: `platform/event-contracts`. Every payload embeds `metadata`:
 | `referral.status-changed.v1` | referral → tracker | userId | userId, jobId, jobTitle, companyName, jobLocation, applyUrl, contactId, contactName, previousStatus, newStatus, changedAt |
 | `referral.reminder-due.v1` | referral → notification | userId | reminderId, userId, contactId, jobId, contactName, jobTitle, companyName, reminderType, message, draftedFollowUp, dueAt |
 | `resume.version-created.v1` | analyzer → tracker | userId | userId, resumeVersionId, versionName, jobId, analysisId, scoreBefore, scoreAfter, fileFormat |
-| `application.status-changed.v1` | tracker → notification, (Phase 3 analytics) | userId | userId, applicationId, jobId, previousStage, newStage, resumeVersionId, changedAt |
+| `application.status-changed.v1` | tracker → (Phase 3 analytics; the user made or caused the change, so no notification) | userId | userId, applicationId, jobId, previousStage, newStage, resumeVersionId, changedAt |
 
 **Compatibility rules:** consumers ignore unknown fields (`@JsonIgnoreProperties(ignoreUnknown = true)`, covered
 by `EventContractsTest`); adding optional fields keeps the topic; removing/renaming fields or changing meaning

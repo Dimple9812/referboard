@@ -141,6 +141,8 @@ class ReferralFlowIT {
     ObjectMapper mapper;
     @Autowired
     ReminderService reminderService;
+    @Autowired
+    org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @BeforeAll
     static void subscribe(@Autowired EmbeddedKafkaBroker broker) {
@@ -260,6 +262,8 @@ class ReferralFlowIT {
         assertThat(bad.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(bad.getBody()).contains("INVALID_TRANSITION");
 
+        // A user who never asked for drafts still gets reminders drafted from their profile
+        jdbc.update("delete from user_snapshots");
         assertThat(json(status("REQUEST_SENT"), 200).get("requestSentAt").isNull()).isFalse();
         JsonNode connected = json(status("CONNECTED"), 200);
         assertThat(connected.get("connectedAt").asText()).isEqualTo("2026-10-01T09:00:00Z");
@@ -289,7 +293,8 @@ class ReferralFlowIT {
         assertThat(active).hasSize(1);
         assertThat(active.at("/0/message").asText()).isEqualTo("Connected with Priya Sharma 2 days ago — send your "
                 + "referral message for Senior Backend Engineer (Java) at Northwind.");
-        assertThat(active.at("/0/draftedFollowUp").asText()).startsWith("Hi Priya,").contains("referring me");
+        assertThat(active.at("/0/draftedFollowUp").asText()).startsWith("Hi Priya,").contains("referring me")
+                .contains("A bit about me: I'm a Backend Engineer at Lumen Pay").endsWith("Asha");
 
         JsonNode due = awaitEvents(Topics.REFERRAL_REMINDER_DUE, 1).getFirst();
         assertThat(due.get("reminderType").asText()).isEqualTo("SEND_REFERRAL_MESSAGE");

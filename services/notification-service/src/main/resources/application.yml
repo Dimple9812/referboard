@@ -1,0 +1,105 @@
+server:
+  port: ${PORT:8088}
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+spring:
+  application:
+    name: notification-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/referboard?currentSchema=notification,public}
+    username: ${DB_USERNAME:notification_svc}
+    password: ${DB_PASSWORD:notification_svc}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: notification
+        jdbc.time_zone: UTC
+  flyway:
+    schemas: notification
+    default-schema: notification
+  mail:
+    # Empty SMTP_HOST = emails are rendered and recorded as SKIPPED (no mail server in plain local runs).
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: notification-service
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        max.poll.records: 50
+    listener:
+      ack-mode: record
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        delivery.timeout.ms: 15000
+        request.timeout.ms: 10000
+
+eureka:
+  client:
+    enabled: ${EUREKA_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+referboard:
+  security:
+    jwt:
+      jwk-set-uri: ${JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+      issuer: ${JWT_ISSUER:referboard-auth}
+      audience: ${JWT_AUDIENCE:referboard}
+  outbox:
+    relay-enabled: false   # this service only consumes events; it has no outbox table
+  notification:
+    # Where links in emails point (the frontend), and the public base URL for one-click unsubscribe links.
+    app-base-url: ${APP_BASE_URL:http://localhost:5173}
+    api-base-url: ${PUBLIC_API_BASE_URL:http://localhost:8080}
+    mail-from: ${MAIL_FROM:ReferBoard <noreply@referboard.local>}
+    max-emails-per-user-per-day: ${MAX_EMAILS_PER_USER_PER_DAY:20}
+    sender-interval-ms: ${EMAIL_SENDER_INTERVAL_MS:10000}
+    max-attempts: 5
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    mail:
+      enabled: false   # an SMTP outage must not mark the service unhealthy; emails queue and retry
+
+logging:
+  pattern:
+    correlation: "[%X{correlationId:-}] "

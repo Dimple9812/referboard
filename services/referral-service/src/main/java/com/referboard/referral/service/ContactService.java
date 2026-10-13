@@ -83,6 +83,7 @@ public class ContactService {
     /** Adds someone the user found themselves. The profile URL is validated as text and never requested. */
     public ContactResponse create(UUID userId, UUID jobId, CreateContactRequest req) {
         JobSnapshot job = snapshots.job(jobId);   // 404 for unknown jobs; HTTP call kept outside the transaction
+        snapshots.refreshUserQuietly(userId);     // reminders for this contact will draft from it
         String url = normalizeUrl(req.profileUrl());
         return tx.execute(status -> {
             if (contacts.countByUserIdAndJobId(userId, jobId) >= props.maxContactsPerJob()) {

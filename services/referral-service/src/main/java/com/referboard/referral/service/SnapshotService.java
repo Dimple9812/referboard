@@ -116,6 +116,18 @@ public class SnapshotService {
         return users.findById(userId).orElseThrow();
     }
 
+    /**
+     * Refreshes the user's snapshot if stale, ignoring failures. Called on requests that lead to reminders, so the
+     * scheduler (which has no user token) drafts follow-ups from the user's real profile.
+     */
+    public void refreshUserQuietly(UUID userId) {
+        try {
+            user(userId);
+        } catch (RuntimeException e) {
+            log.info("Could not refresh profile snapshot for user {}: {}", userId, e.getMessage());
+        }
+    }
+
     /** Snapshot for scheduled work (no user token): whatever we stored last, or null. */
     public JobSnapshot storedJob(UUID jobId) {
         return jobs.findById(jobId).orElse(null);

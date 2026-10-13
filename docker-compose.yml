@@ -73,6 +73,11 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     depends_on: [kafka]
 
+  # Local mail catcher: every email the app sends lands here (web UI on :8025). Not for production.
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    ports: ["8025:8025", "1025:1025"]
+
   # ---------- platform ----------
   discovery-server:
     build:
@@ -224,6 +229,32 @@ services:
       kafka: { condition: service_healthy }
       discovery-server: { condition: service_healthy }
       job-service: { condition: service_started }
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args: { MODULE: services/notification-service }
+    ports: ["8088:8088"]
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/referboard?currentSchema=notification,public
+      DB_USERNAME: ${NOTIFICATION_DB_USERNAME:-notification_svc}
+      DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-notification_svc}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_AUTH: ${SMTP_AUTH:-false}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      MAIL_FROM: ${MAIL_FROM:-ReferBoard <noreply@referboard.local>}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8080}
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+      mailpit: { condition: service_started }
 
 volumes:
   resumes:
