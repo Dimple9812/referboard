@@ -208,6 +208,23 @@ services:
       job-service: { condition: service_started }
       profile-service: { condition: service_started }
 
+  tracker-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args: { MODULE: services/tracker-service }
+    ports: ["8087:8087"]
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/referboard?currentSchema=tracker,public
+      DB_USERNAME: ${TRACKER_DB_USERNAME:-tracker_svc}
+      DB_PASSWORD: ${TRACKER_DB_PASSWORD:-tracker_svc}
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+      job-service: { condition: service_started }
+
 volumes:
   resumes:
   pgdata:

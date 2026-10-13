@@ -365,24 +365,47 @@ jd_analyses (
 usage_counters (user_id, period char(7) /* YYYY-MM */, analyses int, pk (user_id, period))
 ```
 
-### 4.7 `tracker` — tracker-service
+### 4.7 `tracker` — tracker-service ✅ implemented
 
 ```sql
 applications (
-  id, user_id, job_id, job_title, company_name, location, apply_url,
+  id, user_id, job_id null /* null = job found outside ReferBoard */, job_title, company_name, location, apply_url,
   stage ('SAVED'|'APPLIED'|'REFERRAL_REQUESTED'|'REFERRED'|'INTERVIEW'|'OFFER'|'REJECTED'),
-  position numeric,                               -- fractional ordering within a Kanban column
-  resume_version_id null, applied_at, notes, created_at, updated_at, deleted_at, version)
-  unique (user_id, job_id) where deleted_at is null
-  index (user_id, stage, position)
+  position double precision,                      -- fractional ordering within a Kanban column
+  source ('MANUAL'|'REFERRAL'), resume_version_id, referral_summary, notes,
+  applied_at, stage_changed_at, next_action, next_action_at, job_closed_at,
+  created_at, updated_at, deleted_at, version)
+  unique (user_id, job_id) where deleted_at is null and job_id is not null
+  index (user_id, stage, position) where deleted_at is null; index (job_id) where deleted_at is null
 
-application_events (id, application_id fk, type ('STAGE_CHANGED'|'NOTE'|'RESUME_LINKED'|'REFERRAL_UPDATE'),
-  from_stage, to_stage, details jsonb, occurred_at)
-  index (application_id, occurred_at)
+application_events (id, seq identity /* timeline order */, application_id fk,
+  type ('CREATED'|'STAGE_CHANGED'|'NOTE'|'RESUME_LINKED'|'REFERRAL_UPDATE'|'JOB_CLOSED'|'UPDATED'),
+  from_stage, to_stage, message, details jsonb, occurred_at)
+  index (application_id, seq)
 
-resume_links_pending (user_id, job_id, resume_version_id, created_at, pk (user_id, job_id))
+resume_links_pending (user_id, job_id, resume_version_id, version_name, created_at, pk (user_id, job_id))
   -- ResumeVersionCreated can arrive before the application card exists
+closed_jobs (job_id pk, closed_at)                -- JobClosed can too
+
+outbox_events, processed_events
 ```
+
+Implementation notes:
+
+- **One card per job, even under races.** Cards are inserted with `insert … on conflict (user_id, job_id) where
+  deleted_at is null and job_id is not null do nothing`, so the user adding a job while a referral event creates it
+  yields one card (the loser gets 409 `ALREADY_TRACKED` or simply updates the existing card). Tested with
+  concurrent HTTP + Kafka rounds.
+- **Kanban ordering:** a moved card takes the midpoint of its new neighbours (`BoardPositions`); a column is
+  renumbered only when a gap falls below 1e-6. New cards go on top.
+- **Event-driven moves only go forward** from Saved / Applied / Referral requested (`Stage.canAutoAdvanceTo`), so a
+  late referral never pulls a card out of Interview, Offer or Rejected; the update still lands on the timeline.
+- `CardService` is shared by the API and the consumers, so both record the same history and publish the same
+  `ApplicationStatusChanged` (via the outbox) in the same transaction as the change.
+- Consumers mark the event id processed first (redeliveries are no-ops); failures retry with backoff, then go to
+  `<topic>.DLT`.
+- `ReferralStatusChanged` carries the job's title, company, location and link (an additive contract change) because
+  a consumer has no user token to call job-service.
 
 ### 4.8 `notification` — notification-service
 
@@ -413,9 +436,9 @@ Source: `platform/event-contracts`. Every payload embeds `metadata`:
 | `user.registered.v1` | auth → notification | userId | userId, email, fullName, authProvider |
 | `profile.updated.v1` | profile → job, analyzer | userId | userId, profileVersion, headline, skills[], totalExperienceYears, college, pastCompanies[], preferences{roles[], locations[], remoteOnly, openToRemote, minSalaryInr, experienceLevel}, embedding[], embeddingModel, embeddingDimensions |
 | `job.upserted.v1` | ingestion → job | jobId | jobId, dedupKey, source, sourceJobId, companyName, companySlug, title, normalizedTitle, location, country, remote, employmentType, seniority, departmentName, descriptionHtml, descriptionText, applyUrl, salaryMin/Max/Currency, postedAt, firstSeenAt, lastSeenAt, skills[], embedding[], embeddingModel, ghostJobSuspected, contentHash |
-| `job.closed.v1` | ingestion → job | jobId | jobId, closedAt, reason (`UNSEEN_7_DAYS`) |
+| `job.closed.v1` | ingestion → job, tracker | jobId | jobId, closedAt, reason (`UNSEEN_7_DAYS`) |
 | `match.daily-digest.v1` | job → notification | userId | userId, digestDate, matches[≤10]{jobId, title, companyName, location, remote, matchPercent, matchedSkills[]} |
-| `referral.status-changed.v1` | referral → tracker | userId | userId, jobId, contactId, contactName, previousStatus, newStatus, changedAt |
+| `referral.status-changed.v1` | referral → tracker | userId | userId, jobId, jobTitle, companyName, jobLocation, applyUrl, contactId, contactName, previousStatus, newStatus, changedAt |
 | `referral.reminder-due.v1` | referral → notification | userId | reminderId, userId, contactId, jobId, contactName, jobTitle, companyName, reminderType, message, draftedFollowUp, dueAt |
 | `resume.version-created.v1` | analyzer → tracker | userId | userId, resumeVersionId, versionName, jobId, analysisId, scoreBefore, scoreAfter, fileFormat |
 | `application.status-changed.v1` | tracker → notification, (Phase 3 analytics) | userId | userId, applicationId, jobId, previousStage, newStage, resumeVersionId, changedAt |

@@ -33,8 +33,8 @@ flowchart LR
 | job-service | ✅ | 5 unit + 4 integration (events → FTS/trigram/pgvector search, Redis cache, matches, DLT, digest) |
 | referral-service | ✅ | 34 unit + 5 integration (Feign → mock job/profile/Claude APIs, draft guard, pipeline events, reminders on a movable clock) |
 | resume-analyzer-service | ⏳ | |
-| tracker-service | ⏳ next | |
-| notification-service | ⏳ | |
+| tracker-service | ✅ | 7 unit + 6 integration (board API, drag-and-drop ordering, referral/resume/closed-job events, create race) |
+| notification-service | ⏳ next | |
 | api-gateway | ⏳ | |
 | frontend | ⏳ | |
 
@@ -55,6 +55,7 @@ docker compose --profile tools up kafka-ui   # optional Kafka UI on :8090
 | http://localhost:8083/swagger-ui.html | job-service API docs (search, detail + match breakdown, recommendations) |
 | http://localhost:8084/swagger-ui.html | ingestion admin API (ADMIN role) |
 | http://localhost:8085/swagger-ui.html | referral-service API docs (people to reach, drafts, CRM, reminders) |
+| http://localhost:8087/swagger-ui.html | tracker-service API docs (application board) |
 
 Try it:
 
@@ -147,6 +148,26 @@ and publishes `referral.status-changed.v1`. Two reminders are scheduled automati
 still in that status: *connected 2 days ago → send your referral message* and *no reply 5 days after asking → follow
 up* (`referral.reminder-due.v1`, with a drafted message; notification-service will email them). Tune with
 `REFERRAL_SEND_REFERRAL_AFTER` / `REFERRAL_FOLLOW_UP_AFTER` (ISO-8601 durations).
+
+## How the application tracker works
+
+`GET /api/applications/board` returns seven columns — Saved, Applied, Referral requested, Referred, Interview,
+Offer, Rejected — with cards in the user's order. Add a ReferBoard job by `jobId` (details are copied from
+job-service) or a job found elsewhere by `jobTitle` + `companyName`. `POST /api/applications/{id}/move`
+`{"stage": "...", "index": n}` is the drag-and-drop call: cards are ordered by a fractional position, so a drop
+updates one row (the column is re-spaced only when a gap runs out). Each card keeps notes, the applied date
+(recorded on the first move to Applied, editable), a next step with a date, and a timeline of every change.
+
+The board also updates itself from other services' events:
+
+| Event | Effect |
+|---|---|
+| referral contact → request sent / connected / asked / referred | the job is added to the board if it isn't there; the card shows the latest referral update |
+| referral asked / referred | the card moves to *Referral requested* / *Referred*, but only forward from Saved, Applied or Referral requested (never out of Interview, Offer or Rejected) |
+| tailored resume created for a job | linked to that job's card (held until the card exists) |
+| job posting closed | the card is flagged "posting closed" |
+
+Every column change publishes `application.status-changed.v1`.
 
 ## Adding skills to the taxonomy
 

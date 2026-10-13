@@ -274,6 +274,8 @@ class ReferralFlowIT {
         assertThat(changes.get(1).get("previousStatus").asText()).isEqualTo("REQUEST_SENT");
         assertThat(changes.get(1).get("newStatus").asText()).isEqualTo("CONNECTED");
         assertThat(changes.get(1).get("jobId").asText()).isEqualTo(JOB.toString());
+        assertThat(changes.get(1).get("jobTitle").asText()).isEqualTo("Senior Backend Engineer (Java)");
+        assertThat(changes.get(1).get("companyName").asText()).isEqualTo("Northwind");
         assertThat(changes.get(1).at("/metadata/correlationId").asText()).isNotBlank();
 
         // Not due yet

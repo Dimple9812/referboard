@@ -11,12 +11,19 @@ import java.util.UUID;
  * REFERRED → "Referred").
  *
  * <p>Statuses: NOT_CONTACTED, REQUEST_SENT, CONNECTED, REFERRAL_ASKED, REFERRED, NO_RESPONSE.
+ *
+ * <p>The job fields (added in a backward-compatible way) let consumers create a card for the job without calling
+ * job-service, which needs a user token they don't have.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ReferralStatusChangedEvent(
         EventMetadata metadata,
         UUID userId,
         UUID jobId,
+        String jobTitle,
+        String companyName,
+        String jobLocation,
+        String applyUrl,
         UUID contactId,
         String contactName,
         String previousStatus,

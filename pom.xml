@@ -30,6 +30,7 @@
         <module>services/ingestion-service</module>
         <module>services/job-service</module>
         <module>services/referral-service</module>
+        <module>services/tracker-service</module>
     </modules>
 
     <properties>

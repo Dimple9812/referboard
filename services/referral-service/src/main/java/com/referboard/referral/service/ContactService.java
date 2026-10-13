@@ -202,9 +202,11 @@ public class ContactService {
         reminders.obsoleteAllPending(c.getId());
         reminders.completeFiredExcept(c.getId(), target);
         reminderService.scheduleFor(c, now);
+        JobSnapshot job = jobs.findById(c.getJobId()).orElseThrow();
         events.publish(new ReferralStatusChangedEvent(eventJson.newMetadata("ReferralStatusChanged"), userId,
-                c.getJobId(), c.getId(), c.getFullName(), from.name(), target.name(), now));
-        return mapper.toResponse(c, jobs.findById(c.getJobId()).orElse(null));
+                c.getJobId(), job.getTitle(), job.getCompanyName(), job.getLocation(), job.getApplyUrl(),
+                c.getId(), c.getFullName(), from.name(), target.name(), now));
+        return mapper.toResponse(c, job);
     }
 
     @Transactional
