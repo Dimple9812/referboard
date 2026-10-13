@@ -20,6 +20,17 @@ import org.springframework.core.Ordered;
 @Import(GlobalExceptionHandler.class)
 public class CommonWebAutoConfiguration {
 
+    /** Registered only for services that use OpenFeign. */
+    @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(name = "feign.RequestInterceptor")
+    static class FeignForwarding {
+        @Bean
+        @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
+        public com.referboard.common.web.ForwardingFeignInterceptor forwardingFeignInterceptor() {
+            return new com.referboard.common.web.ForwardingFeignInterceptor();
+        }
+    }
+
     @Bean
     public FilterRegistrationBean<CorrelationIdFilter> correlationIdFilter() {
         FilterRegistrationBean<CorrelationIdFilter> registration = new FilterRegistrationBean<>(new CorrelationIdFilter());

@@ -31,9 +31,9 @@ flowchart LR
 | profile-service | ✅ | 21 unit + 5 integration (real PDF/DOCX → parse → pgvector → Kafka; concurrent-onboarding race) |
 | ingestion-service | ✅ | 54 unit + 2 integration (4 simulated runs over 61 days against mock ATS APIs; force-republish) |
 | job-service | ✅ | 5 unit + 4 integration (events → FTS/trigram/pgvector search, Redis cache, matches, DLT, digest) |
-| referral-service | ⏳ next | |
+| referral-service | ✅ | 34 unit + 5 integration (Feign → mock job/profile/Claude APIs, draft guard, pipeline events, reminders on a movable clock) |
 | resume-analyzer-service | ⏳ | |
-| tracker-service | ⏳ | |
+| tracker-service | ⏳ next | |
 | notification-service | ⏳ | |
 | api-gateway | ⏳ | |
 | frontend | ⏳ | |
@@ -54,6 +54,7 @@ docker compose --profile tools up kafka-ui   # optional Kafka UI on :8090
 | http://localhost:8082/swagger-ui.html | profile-service API docs |
 | http://localhost:8083/swagger-ui.html | job-service API docs (search, detail + match breakdown, recommendations) |
 | http://localhost:8084/swagger-ui.html | ingestion admin API (ADMIN role) |
+| http://localhost:8085/swagger-ui.html | referral-service API docs (people to reach, drafts, CRM, reminders) |
 
 Try it:
 
@@ -121,6 +122,31 @@ comments. The ones that matter today:
 | `KAFKA_BOOTSTRAP_SERVERS` | each service | |
 | `EUREKA_URL` | each service | |
 | `LOG_FORMAT` | each service | `ecs` for structured JSON logs; empty for plain text |
+
+## How the referral assistant works
+
+ReferBoard never visits LinkedIn and never sends anything. For a job, `GET /api/referrals/jobs/{jobId}/suggestions`
+returns the kinds of people worth reaching (recruiters, engineering managers, people in the same role, alumni of your
+college, people who share a past employer), each with a LinkedIn people-search link that you open yourself. You add
+the people you choose as contacts (name, profile URL and/or headline; the URL is validated as text, never fetched).
+
+`POST /api/referrals/contacts/{id}/drafts` writes a connection note (≤300 characters, LinkedIn's limit) and a
+referral request, each in a WARM and a CONCISE tone, or follow-ups (`{"type":"FOLLOW_UP"}`). Drafts use only facts
+from your profile and the job:
+
+- With an `ANTHROPIC_API_KEY` (or OpenAI) the LLM drafts; every draft is then checked. A note over 300 characters is
+  shortened at a sentence boundary; a draft containing a **number that isn't in your resume or the job** (an invented
+  metric, team size or years of experience) or a placeholder like `[Name]` is replaced with the template draft. The
+  response says how many were replaced.
+- Without a key, or past `REFERRAL_MAX_AI_DRAFTS_PER_DAY` (default 120 per user per day), template drafts are built
+  from the same facts. Achievements are resume bullets quoted verbatim.
+
+You record what you did by moving the contact: `NOT_CONTACTED → REQUEST_SENT → CONNECTED → REFERRAL_ASKED → REFERRED`,
+with `NO_RESPONSE` from any contacted state (and back, if they reply). Each status gets a timestamp and a history row,
+and publishes `referral.status-changed.v1`. Two reminders are scheduled automatically and fire only if the contact is
+still in that status: *connected 2 days ago → send your referral message* and *no reply 5 days after asking → follow
+up* (`referral.reminder-due.v1`, with a drafted message; notification-service will email them). Tune with
+`REFERRAL_SEND_REFERRAL_AFTER` / `REFERRAL_FOLLOW_UP_AFTER` (ISO-8601 durations).
 
 ## Adding skills to the taxonomy
 

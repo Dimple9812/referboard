@@ -291,29 +291,55 @@ are ignored.
 **Daily digest:** 08:00 Asia/Kolkata, each user's top ≤ 10 new matches scoring ≥ 60 → `DailyMatchDigest`; a match
 appears in at most one digest.
 
-### 4.5 `referral` — referral-service
+### 4.5 `referral` — referral-service ✅ implemented
 
 ```sql
-job_snapshots (job_id pk, title, company_name, location, skills text[], description_excerpt, fetched_at)
+job_snapshots (job_id pk, title, company_name, location, apply_url, skills jsonb, description_excerpt, fetched_at)
+user_snapshots (user_id pk, full_name, headline, current_title, current_company, experience_years, college,
+  past_companies jsonb, skills jsonb, achievements jsonb /* resume bullets with numbers, verbatim */, fetched_at)
 
 contacts (
-  id, user_id, job_id, full_name, profile_url, headline,
+  id, user_id, job_id fk → job_snapshots, full_name, profile_url, headline,
   person_type ('RECRUITER'|'ENGINEERING_MANAGER'|'TEAM_MEMBER'|'ALUMNI'|'EX_COLLEAGUE'|'OTHER'),
   status ('NOT_CONTACTED'|'REQUEST_SENT'|'CONNECTED'|'REFERRAL_ASKED'|'REFERRED'|'NO_RESPONSE'),
   request_sent_at, connected_at, referral_asked_at, referred_at, no_response_at,
   notes, created_at, updated_at, deleted_at, version)
-  index (user_id, job_id) where deleted_at is null; index (user_id, status)
+  index (user_id, job_id) where deleted_at is null; index (user_id, status) where deleted_at is null
 
 contact_status_history (id, contact_id fk, from_status, to_status, changed_at)
 
 message_drafts (id, user_id, contact_id fk, kind ('CONNECTION_NOTE'|'REFERRAL_REQUEST'|'FOLLOW_UP'),
-  tone ('WARM'|'CONCISE'), content, char_count, model, prompt_version, copied_at, created_at)
+  tone ('WARM'|'CONCISE'), content, char_count, model /* 'template' or provider:model */, prompt_version,
+  copied_at, created_at)
   check (kind <> 'CONNECTION_NOTE' or char_count <= 300)
 
-reminders (id, user_id, contact_id fk, type ('SEND_REFERRAL_MESSAGE'|'FOLLOW_UP'), due_at,
-  status ('PENDING'|'FIRED'|'DONE'|'DISMISSED'), drafted_follow_up, created_at, fired_at)
-  index (status, due_at)
+reminders (id, user_id, contact_id fk, type ('SEND_REFERRAL_MESSAGE'|'FOLLOW_UP'), trigger_status, due_at,
+  status ('PENDING'|'FIRED'|'DONE'|'DISMISSED'|'OBSOLETE'), message, drafted_follow_up, created_at, fired_at)
+  index (due_at) where status = 'PENDING'; index (user_id, status)
+
+outbox_events, processed_events
 ```
+
+Implementation notes:
+
+- **Never touches LinkedIn.** Suggestions are LinkedIn people-search URLs built as strings for the user to open;
+  pasted profile URLs are normalised (`/in/<slug>`, https, no query) but never requested.
+- **Cross-service reads** use OpenFeign (`JobClient`, `ProfileClient`) resolved through Eureka, with the caller's
+  JWT and correlation id forwarded by common-lib's `ForwardingFeignInterceptor`. Upstream 404 → our 404; 5xx and
+  connection failures → 502 `UPSTREAM_UNAVAILABLE` (a stale snapshot is used instead when one exists).
+- **Snapshots** (job 6 h TTL, user 10 min) are upserted with `insert … on conflict`, so the reminder scheduler can draft
+  follow-ups with no user token, and concurrent requests can't collide.
+- **Drafting:** `DraftFacts` is the only input to both drafters. The LLM (forced JSON schema, prompt treats the facts
+  block as data) produces four drafts in one call; `DraftGuard` shortens over-long notes and rejects drafts with a
+  number not present in the facts (compared as whole tokens) or a placeholder, substituting `TemplateDrafter`'s
+  draft. Per-user daily AI allowance; otherwise templates.
+- **Pipeline:** `ContactStatus.allowedTargets()` (forward with skips, one step back, `NO_RESPONSE` from contacted
+  states and back, `REFERRED` terminal). A change stamps the status timestamp, writes history, obsoletes pending
+  reminders, completes fired ones for the previous status, schedules the next, and publishes through the outbox —
+  all in one transaction, guarded by the contact's `@Version`.
+- **Reminders:** a scheduled scan locks due rows with `FOR UPDATE SKIP LOCKED` (safe with several instances), fires
+  only if the contact is still in `trigger_status`, stores the drafted message as a draft, and publishes
+  `ReferralReminderDue`.
 
 ### 4.6 `analyzer` — resume-analyzer-service
 

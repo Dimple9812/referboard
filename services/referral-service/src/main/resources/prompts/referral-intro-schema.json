@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["warmConnectionNote", "conciseConnectionNote", "warmReferralRequest", "conciseReferralRequest"],
+  "properties": {
+    "warmConnectionNote": {"type": "string", "description": "WARM tone connection note, at most 280 characters"},
+    "conciseConnectionNote": {"type": "string", "description": "CONCISE tone connection note, at most 280 characters"},
+    "warmReferralRequest": {"type": "string", "description": "WARM tone referral request message, sent after connecting"},
+    "conciseReferralRequest": {"type": "string", "description": "CONCISE tone referral request message, sent after connecting"}
+  }
+}

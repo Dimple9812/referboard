@@ -105,9 +105,24 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnexpected(Exception ex, HttpServletRequest request) {
+        if (isOptimisticLockFailure(ex)) {
+            // Two writes raced on a versioned row (e.g. the same contact moved in two tabs): reload and retry.
+            return build(HttpStatus.CONFLICT, "CONCURRENT_UPDATE",
+                    "This item was changed elsewhere. Reload and try again.", request, List.of());
+        }
         log.error("Unhandled exception on {} {}", request.getMethod(), request.getRequestURI(), ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR",
                 "Something went wrong. Quote the correlation id if you contact support.", request, List.of());
+    }
+
+    /** Matched by name: spring-tx is optional for services using this library. */
+    private static boolean isOptimisticLockFailure(Throwable ex) {
+        for (Class<?> c = ex.getClass(); c != null; c = c.getSuperclass()) {
+            if (c.getName().equals("org.springframework.dao.OptimisticLockingFailureException")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static ApiError body(HttpStatus status, String code, String message, String path,

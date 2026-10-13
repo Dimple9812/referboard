@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["warmFollowUp", "conciseFollowUp"],
+  "properties": {
+    "warmFollowUp": {"type": "string", "description": "WARM tone follow-up after no reply to a referral request"},
+    "conciseFollowUp": {"type": "string", "description": "CONCISE tone follow-up after no reply to a referral request"}
+  }
+}

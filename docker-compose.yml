@@ -184,6 +184,30 @@ services:
       kafka: { condition: service_healthy }
       discovery-server: { condition: service_healthy }
 
+  referral-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args: { MODULE: services/referral-service }
+    ports: ["8085:8085"]
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/referboard?currentSchema=referral,public
+      DB_USERNAME: ${REFERRAL_DB_USERNAME:-referral_svc}
+      DB_PASSWORD: ${REFERRAL_DB_PASSWORD:-referral_svc}
+      # Drafting: Claude if a key is set, otherwise deterministic template drafts.
+      LLM_PROVIDER: ${LLM_PROVIDER:-auto}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # job-service and profile-service are resolved through Eureka (JOB_SERVICE_URL / PROFILE_SERVICE_URL override).
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+      job-service: { condition: service_started }
+      profile-service: { condition: service_started }
+
 volumes:
   resumes:
   pgdata:
