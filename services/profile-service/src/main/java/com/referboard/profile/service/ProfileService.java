@@ -60,7 +60,7 @@ public class ProfileService {
     /** Applies the user's reviewed/edited profile. Skills they add are USER skills and survive future re-parses. */
     @Transactional
     public ProfileResponse update(UUID userId, UpdateProfileRequest req) {
-        Profile profile = profiles.findById(userId).orElseGet(() -> profiles.save(Profile.create(userId)));
+        Profile profile = lockOrCreate(userId);
         LocalDate today = LocalDate.now(clock);
 
         profile.setFullName(trim(req.fullName()));
@@ -114,6 +114,9 @@ public class ProfileService {
 
     @Transactional
     public PreferencesDto updatePreferences(UUID userId, PreferencesRequest req) {
+        // Lock the profile row first: it serialises every write for this user, so concurrent saves can't both
+        // try to create the preferences row.
+        Profile profile = lockOrCreate(userId);
         JobPreferences prefs = preferences.findById(userId).orElseGet(() -> JobPreferences.defaults(userId));
         prefs.setRoles(clean(req.roles()));
         prefs.setLocations(clean(req.locations()));
@@ -122,8 +125,6 @@ public class ProfileService {
         prefs.setMinSalaryInr(req.minSalaryInr());
         prefs.setExperienceLevel(req.experienceLevel());
         preferences.save(prefs);
-
-        Profile profile = profiles.findById(userId).orElseGet(() -> profiles.save(Profile.create(userId)));
         touch(profile, userId);
         return mapper.toDto(prefs);
     }
@@ -134,7 +135,7 @@ public class ProfileService {
      */
     @Transactional
     public void applyParsedResume(UUID userId, UUID resumeId, ParsedResume parsed, Resume.Parser parser) {
-        Profile profile = profiles.findById(userId).orElseGet(() -> profiles.save(Profile.create(userId)));
+        Profile profile = lockOrCreate(userId);
         LocalDate today = LocalDate.now(clock);
 
         setIfPresent(parsed.fullName(), profile::setFullName);
@@ -193,6 +194,12 @@ public class ProfileService {
         profile.setTotalExperienceYears(ExperienceMath.totalYears(exps.stream()
                 .map(e -> ExperienceMath.span(e.getStartDate(), e.getEndDate(), e.isCurrent(), today))
                 .toList()));
+    }
+
+    /** Creates the profile row if needed (race-free) and locks it for the rest of the transaction. */
+    private Profile lockOrCreate(UUID userId) {
+        profiles.insertIfAbsent(userId);
+        return profiles.findForUpdate(userId).orElseThrow();
     }
 
     /**

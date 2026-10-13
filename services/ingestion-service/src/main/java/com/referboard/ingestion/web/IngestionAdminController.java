@@ -65,12 +65,14 @@ public class IngestionAdminController {
     }
 
     @PostMapping("/runs")
-    @Operation(summary = "Start an ingestion run now (runs in the background)")
-    public ResponseEntity<Map<String, Object>> trigger() {
-        if (!scheduler.trigger(IngestionRun.Trigger.MANUAL)) {
+    @Operation(summary = "Start an ingestion run now (runs in the background). forceRepublish=true re-publishes "
+            + "every listed posting even if unchanged, to rebuild a downstream service (e.g. a fresh job-service "
+            + "database) after Kafka retention has expired.")
+    public ResponseEntity<Map<String, Object>> trigger(@RequestParam(defaultValue = "false") boolean forceRepublish) {
+        if (!scheduler.trigger(IngestionRun.Trigger.MANUAL, forceRepublish)) {
             throw ApiException.conflict("RUN_IN_PROGRESS", "An ingestion run is already in progress");
         }
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("started", true));
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("started", true, "forceRepublish", forceRepublish));
     }
 
     @GetMapping("/runs")

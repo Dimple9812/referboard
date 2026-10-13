@@ -65,6 +65,11 @@ public class IngestionOrchestrator {
 
     /** @return the finished run, or empty if another instance is already running one */
     public Optional<IngestionRun> run(IngestionRun.Trigger trigger) {
+        return run(trigger, false);
+    }
+
+    /** @param forceRepublish re-publish every listed posting even if unchanged (downstream resync) */
+    public Optional<IngestionRun> run(IngestionRun.Trigger trigger, boolean forceRepublish) {
         Optional<RunLock.Held> held = lock.tryAcquire();
         if (held.isEmpty()) {
             log.info("Ingestion run skipped: another run holds the lock");
@@ -72,17 +77,18 @@ public class IngestionOrchestrator {
         }
         try (RunLock.Held ignored = held.get()) {
             MDC.put("ingestionRun", trigger.name());
-            return Optional.of(doRun(trigger));
+            return Optional.of(doRun(trigger, forceRepublish));
         } finally {
             MDC.remove("ingestionRun");
         }
     }
 
-    private IngestionRun doRun(IngestionRun.Trigger trigger) {
+    private IngestionRun doRun(IngestionRun.Trigger trigger, boolean forceRepublish) {
         Instant started = clock.instant();
         IngestionRun run = runs.save(IngestionRun.start(trigger, started));
         List<SourceTarget> targets = registry.dueTargets(started);
-        log.info("Ingestion run {} started ({}): {} sources due", run.getId(), trigger, targets.size());
+        log.info("Ingestion run {} started ({}{}): {} sources due", run.getId(), trigger,
+                forceRepublish ? ", force-republish" : "", targets.size());
 
         AtomicReference<PostingProcessor.Stats> stats = new AtomicReference<>(PostingProcessor.Stats.EMPTY);
         Map<String, Integer> dropped = new TreeMap<>();
@@ -112,7 +118,7 @@ public class IngestionOrchestrator {
                     }
                     counters[3] += kept.size();
                     try {
-                        stats.updateAndGet(s -> s.plus(processor.process(kept, now)));
+                        stats.updateAndGet(s -> s.plus(processor.process(kept, now, forceRepublish)));
                         recordSuccess(f.target(), f.postings().size(), now);
                     } catch (Exception e) {
                         log.error("Processing {} failed", f.target().sourceKey(), e);

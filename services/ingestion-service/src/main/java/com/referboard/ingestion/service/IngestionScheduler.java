@@ -48,20 +48,28 @@ public class IngestionScheduler {
 
     /** Starts a run in the background. Returns false if this instance is already running one. */
     public boolean trigger(IngestionRun.Trigger trigger) {
+        return trigger(trigger, false);
+    }
+
+    public boolean trigger(IngestionRun.Trigger trigger, boolean forceRepublish) {
         if (running.get()) {
             return false;
         }
-        executor.execute(() -> runNow(trigger));
+        executor.execute(() -> runNow(trigger, forceRepublish));
         return true;
     }
 
     private void runNow(IngestionRun.Trigger trigger) {
+        runNow(trigger, false);
+    }
+
+    private void runNow(IngestionRun.Trigger trigger, boolean forceRepublish) {
         if (!running.compareAndSet(false, true)) {
             log.info("Ingestion already running in this instance; {} trigger ignored", trigger);
             return;
         }
         try {
-            orchestrator.run(trigger);
+            orchestrator.run(trigger, forceRepublish);
         } catch (Exception e) {
             log.error("Ingestion run ({}) crashed", trigger, e);
         } finally {

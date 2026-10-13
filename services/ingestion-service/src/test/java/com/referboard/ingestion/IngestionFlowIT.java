@@ -261,6 +261,13 @@ class IngestionFlowIT {
         Thread.sleep(1500);
         assertThat(drain()).as("idempotent: no events for unchanged postings").hasSize(eventsBefore);
 
+        // ---------- run 2b: force-republish (downstream resync) re-sends every listed posting ----------
+        int beforeForce = upserts.size();
+        IngestionRun forced = orchestrator.run(IngestionRun.Trigger.MANUAL, true).orElseThrow();
+        assertThat(forced.getUpdated()).as("every listed posting republished").isEqualTo(6);
+        awaitUpsert(e -> upserts.size() >= beforeForce + 6);
+        assertThat(upserts.subList(beforeForce, upserts.size())).allSatisfy(e -> assertThat(e.embedding()).hasSize(1536));
+
         // ---------- run 3: 8 days later ----------
         clock.advance(Duration.ofDays(8));
         ObjectNode acme = (ObjectNode) mapper.readTree(bodies.get("/v1/boards/acmepay/jobs"));

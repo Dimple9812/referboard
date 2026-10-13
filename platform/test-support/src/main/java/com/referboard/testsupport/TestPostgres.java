@@ -96,8 +96,9 @@ public final class TestPostgres {
         try (Connection c = DriverManager.getConnection(url, user, password);
              Statement s = c.createStatement()) {
             s.execute("create extension if not exists vector schema public");
+            s.execute("create extension if not exists pg_trgm schema public");
         } catch (SQLException e) {
-            throw new IllegalStateException("pgvector extension is not available on the test database", e);
+            throw new IllegalStateException("pgvector/pg_trgm extensions are not available on the test database", e);
         }
     }
 

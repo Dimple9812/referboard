@@ -28,10 +28,10 @@ flowchart LR
 | ai-client | ✅ | 9 — Claude/OpenAI request shape, retries on 429/5xx/529, no retry on 4xx, embeddings |
 | discovery-server | ✅ | boots, health UP |
 | auth-service | ✅ | 15 unit + 7 integration (real Postgres, embedded Kafka) |
-| profile-service | ✅ | 21 unit + 4 integration (real PDF/DOCX → parse → pgvector → Kafka) |
-| ingestion-service | ✅ | 54 unit + 2 integration (4 simulated runs over 61 days against mock ATS APIs) |
-| job-service | ⏳ next | |
-| referral-service | ⏳ | |
+| profile-service | ✅ | 21 unit + 5 integration (real PDF/DOCX → parse → pgvector → Kafka; concurrent-onboarding race) |
+| ingestion-service | ✅ | 54 unit + 2 integration (4 simulated runs over 61 days against mock ATS APIs; force-republish) |
+| job-service | ✅ | 5 unit + 4 integration (events → FTS/trigram/pgvector search, Redis cache, matches, DLT, digest) |
+| referral-service | ⏳ next | |
 | resume-analyzer-service | ⏳ | |
 | tracker-service | ⏳ | |
 | notification-service | ⏳ | |
@@ -52,6 +52,7 @@ docker compose --profile tools up kafka-ui   # optional Kafka UI on :8090
 | http://localhost:8081/swagger-ui.html | auth-service API docs |
 | http://localhost:8081/.well-known/jwks.json | public signing keys |
 | http://localhost:8082/swagger-ui.html | profile-service API docs |
+| http://localhost:8083/swagger-ui.html | job-service API docs (search, detail + match breakdown, recommendations) |
 | http://localhost:8084/swagger-ui.html | ingestion admin API (ADMIN role) |
 
 Try it:
@@ -66,6 +67,11 @@ curl localhost:8081/api/auth/me -H "Authorization: Bearer <accessToken>"
 curl -X POST localhost:8082/api/profile/resumes -H "Authorization: Bearer <accessToken>" -F "file=@my-cv.pdf"
 curl localhost:8082/api/profile/resumes/<id> -H "Authorization: Bearer <accessToken>"   # until parseStatus=PARSED
 curl localhost:8082/api/profile -H "Authorization: Bearer <accessToken>"                # structured profile
+
+# jobs: search with filters, each result carries your live match %
+curl "localhost:8083/api/jobs?location=Bangalore&q=kafka&postedWithinDays=14" -H "Authorization: Bearer <accessToken>"
+curl "localhost:8083/api/jobs/recommended" -H "Authorization: Bearer <accessToken>"
+curl "localhost:8083/api/jobs/<jobId>/match" -H "Authorization: Bearer <accessToken>"     # score breakdown
 ```
 
 ### AI providers (optional)
@@ -158,6 +164,17 @@ curl -X POST localhost:8084/api/ingestion/runs -H "Authorization: Bearer <ADMIN 
 - A job closes when its board was read successfully but hasn't listed it for 7 days, so a board outage closes
   nothing. Jobs listed for 60+ days are flagged "possible ghost job".
 - Re-running is safe: unchanged postings produce no events.
+- **Rebuilding a downstream service** (e.g. a fresh job-service database after Kafka retention expired):
+  `POST /api/ingestion/runs?forceRepublish=true` re-publishes every currently listed posting.
+
+## Operations: granting ADMIN
+
+There's no self-service admin signup. Promote an existing account in the database, then sign in again so the new
+token carries the role:
+
+```sql
+update auth.users set role = 'ADMIN' where email = 'you@example.com';
+```
 
 ## Deployment notes
 

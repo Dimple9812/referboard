@@ -207,6 +207,35 @@ class ProfileFlowIT {
     }
 
     @Test
+    void preferencesSavedWhileResumeIsParsingDoNotRaceTheProfileCreation() throws Exception {
+        // Onboarding: upload, then immediately save preferences. Both used to create the profile row at the same
+        // time (duplicate key), failing the resume parse.
+        for (int attempt = 0; attempt < 3; attempt++) {
+            UUID user = UUID.randomUUID();
+            String token = TestJwt.tokenFor(user);
+            String resumeId = json(upload(token, Documents.pdf(Documents.sampleResumeText()), "cv.pdf"))
+                    .get("id").asText();
+            var pool = java.util.concurrent.Executors.newFixedThreadPool(4);
+            List<java.util.concurrent.Future<ResponseEntity<String>>> saves = new ArrayList<>();
+            for (int i = 0; i < 4; i++) {
+                saves.add(pool.submit(() -> put("/api/profile/preferences", token, Map.of(
+                        "roles", List.of("Backend Engineer"), "locations", List.of("Bengaluru"),
+                        "remoteOnly", false, "openToRemote", true))));
+            }
+            for (var f : saves) {
+                assertThat(f.get().getStatusCode()).isEqualTo(HttpStatus.OK);
+            }
+            pool.shutdown();
+
+            JsonNode resume = await(() -> json(get("/api/profile/resumes/" + resumeId, token)),
+                    r -> !r.get("parseStatus").asText().equals("PENDING"));
+            assertThat(resume.get("parseStatus").asText()).as(resume.toString()).isEqualTo("PARSED");
+            JsonNode profile = await(() -> json(get("/api/profile", token)), p -> p.get("experiences").size() == 2);
+            assertThat(profile.at("/preferences/roles/0").asText()).isEqualTo("Backend Engineer");
+        }
+    }
+
+    @Test
     void validationOwnershipAndAuth() throws Exception {
         UUID owner = UUID.randomUUID();
         String ownerToken = TestJwt.tokenFor(owner);

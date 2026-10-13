@@ -139,6 +139,26 @@ services:
       discovery-server: { condition: service_healthy }
       auth-service: { condition: service_started }
 
+  job-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args: { MODULE: services/job-service }
+    ports: ["8083:8083"]
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/referboard?currentSchema=job,public
+      DB_USERNAME: ${JOB_DB_USERNAME:-job_svc}
+      DB_PASSWORD: ${JOB_DB_PASSWORD:-job_svc}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+      auth-service: { condition: service_started }
+
   ingestion-service:
     build:
       context: .

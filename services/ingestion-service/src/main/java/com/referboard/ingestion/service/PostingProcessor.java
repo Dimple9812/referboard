@@ -81,6 +81,14 @@ public class PostingProcessor {
     }
 
     public Stats process(List<NormalizedJob> incoming, Instant now) {
+        return process(incoming, now, false);
+    }
+
+    /**
+     * @param forceRepublish re-publish (and re-embed) postings even when unchanged — used to rebuild a downstream
+     *                       consumer (e.g. a fresh job-service database) after Kafka retention has expired
+     */
+    public Stats process(List<NormalizedJob> incoming, Instant now, boolean forceRepublish) {
         if (incoming.isEmpty()) {
             return Stats.EMPTY;
         }
@@ -93,7 +101,11 @@ public class PostingProcessor {
 
         List<Decision> decisions = new ArrayList<>();
         for (NormalizedJob job : unique.values()) {
-            decisions.add(decide(job, existing.get(job.jobId()), now));
+            Decision d = decide(job, existing.get(job.jobId()), now);
+            if (forceRepublish && (d.action() == Action.TOUCH || d.action() == Action.FLAGS_CHANGED)) {
+                d = new Decision(d.job(), d.posting(), Action.CONTENT_CHANGED);
+            }
+            decisions.add(d);
         }
 
         // Embed outside the transaction: it may be a network call.

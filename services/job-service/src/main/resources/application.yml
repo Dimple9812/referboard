@@ -1,0 +1,92 @@
+server:
+  port: ${PORT:8083}
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+spring:
+  application:
+    name: job-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/referboard?currentSchema=job,public}
+    username: ${DB_USERNAME:job_svc}
+    password: ${DB_PASSWORD:job_svc}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:15}
+  flyway:
+    schemas: job
+    default-schema: job
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: job-service
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        max.poll.records: 50
+        max.poll.interval.ms: 600000
+    listener:
+      ack-mode: record
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        delivery.timeout.ms: 15000
+        request.timeout.ms: 10000
+        max.request.size: 2097152
+
+eureka:
+  client:
+    enabled: ${EUREKA_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+referboard:
+  security:
+    jwt:
+      jwk-set-uri: ${JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+      issuer: ${JWT_ISSUER:referboard-auth}
+      audience: ${JWT_AUDIENCE:referboard}
+  jobs:
+    search-cache-ttl: PT60S
+    max-page-size: 50
+    match:
+      threshold: 35                 # matches below this aren't stored for recommendations
+      per-user-limit: 300
+      candidate-limit: 400
+      refresh-interval-ms: 60000    # background scoring of newly ingested jobs
+    digest:
+      cron: "0 0 8 * * *"           # 08:00 India time
+      zone: Asia/Kolkata
+      min-score: 60
+      max-jobs: 10
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    correlation: "[%X{correlationId:-}] "

@@ -220,49 +220,76 @@ close stale postings → record run.
 **Source priority:** ATS boards (3) > Adzuna (2) > sample (1). A lower-priority copy of a job never overwrites,
 touches or reopens one owned by a higher-priority source; the company's own board decides whether it's open.
 
+**Resync:** `POST /api/ingestion/runs?forceRepublish=true` (ADMIN) re-publishes every listed posting, so a
+consumer whose data was lost after Kafka retention expired can be rebuilt.
+
 **Closing & ghost jobs:** closed when not seen for 7 days *and* its source was read successfully after it was last
 seen (so outages close nothing); flagged `ghostJobSuspected` once first seen ≥ 60 days ago and still listed;
 reposts (posted date moving forward) are counted.
 
-### 4.4 `job` — job-service
+### 4.4 `job` — job-service ✅ implemented
+
+job-service uses `JdbcTemplate` rather than JPA: its work is `ON CONFLICT` upserts, pgvector distance and
+full-text ranking, all of which JPA would only wrap in native SQL.
 
 ```sql
-companies (id, slug unique, name, logo_url, website, created_at, updated_at)
+companies (id, slug unique /* normalised name */, name, created_at, updated_at)
+  index gin (name gin_trgm_ops)
 
 jobs (
-  id uuid pk,                                     -- jobId from ingestion (deterministic)
+  id uuid pk,                                     -- jobId from ingestion (deterministic from dedup_key)
   dedup_key unique, source, source_job_id, company_id fk, company_name,
-  title, normalized_title, location, country, remote bool, employment_type, seniority, department,
-  description_html, description_text, apply_url,
+  title, normalized_title, location, country, remote, employment_type, seniority, department,
+  description_html /* sanitised at ingestion */, description_text, apply_url,
   salary_min, salary_max, salary_currency,
-  posted_at, first_seen_at, last_seen_at, status ('OPEN'|'CLOSED'), closed_at,
-  ghost_job_suspected bool, content_hash,
+  posted_at, first_seen_at, last_seen_at,
+  listed_at,                                      -- coalesce(posted_at, first_seen_at): drives "posted N days ago"
+  status ('OPEN'|'CLOSED'), closed_at, ghost_job_suspected, content_hash,
   embedding vector(1536), embedding_model,
-  search_tsv tsvector generated always as (
-     setweight(to_tsvector('english', coalesce(title,'')), 'A') ||
-     setweight(to_tsvector('english', coalesce(company_name,'')), 'B') ||
-     setweight(to_tsvector('english', coalesce(description_text,'')), 'C')) stored,
+  search_tsv tsvector generated always as (title A, company B, description C) stored,
   created_at, updated_at)
-  index gin (search_tsv)
-  index (status, posted_at desc)
-  index (status, remote, posted_at desc)
-  index (lower(location) text_pattern_ops)
-  index gin (title gin_trgm_ops)                  -- fuzzy role search
-  index hnsw (embedding vector_cosine_ops)
+  index (status, listed_at desc); (status, remote, listed_at desc); (company_id); (lower(location) text_pattern_ops)
+  index gin (search_tsv); gin (title gin_trgm_ops); hnsw (embedding vector_cosine_ops)
 
-job_skills (job_id fk, skill varchar(100), pk (job_id, skill)); index (skill)
+job_skills (job_id fk, skill /* canonical */, position, pk (job_id, skill)); index (skill)
 
-user_match_profiles (                             -- local copy of ProfileUpdated; never reads profile schema
-  user_id pk, profile_version, skills text[], experience_years numeric(4,1),
-  preferences jsonb, embedding vector(1536), updated_at)
+user_match_profiles (user_id pk, profile_version, headline, skills jsonb, experience_years,
+  preferences jsonb, embedding vector(1536), embedding_model, updated_at)   -- copy of ProfileUpdated
 
-job_matches (
-  user_id, job_id fk, score smallint,              -- 0..100 shown as match %
-  vector_score real, skill_score real, preference_score real,
-  matched_skills text[], missing_skills text[], computed_at, digested_at,
-  pk (user_id, job_id))
-  index (user_id, score desc)
+job_matches (user_id, job_id fk, score, semantic_score, skill_score, preference_score,
+  matched_skills jsonb, missing_skills jsonb, computed_at, digested_at, pk (user_id, job_id))
+  index (user_id, score desc); (computed_at) where digested_at is null
+
+pending_match_jobs (job_id pk fk, queued_at)      -- new/changed jobs awaiting scoring against all users
 ```
+
+**Search:** filters are `q` (web-search syntax over the weighted tsvector, plus trigram on titles), `role` (every
+word must appear in the title, exactly or with per-word trigram similarity ≥ 0.45, so "bakend engineer" finds
+backend roles but "backend engineer" never matches "frontend engineer"), `location` (any spelling of a city),
+`remote`, `postedWithinDays`, `company`, `seniority`, `skills`, `hideGhostJobs`; sort `RELEVANCE | RECENT | MATCH`;
+page/size ≤ 50. The user-independent page is cached in Redis (60 s); match % is overlaid per request. A Redis
+outage only costs latency.
+
+**Match score** (`MatchScorer`, pure and unit-tested), 0–100:
+
+| Component | Weight | Computation |
+|---|---|---|
+| semantic | 45% | cosine(profile, job) in pgvector, same embedding model only; [0.15, 0.70] rescaled to [0, 1] |
+| skills | 35% | job skills the user has ÷ min(job skills, 8); also yields matched and missing lists |
+| preferences | 20% | mean of: target-role overlap, location/remote fit, seniority distance, salary floor |
+
+A component that can't be computed (no vector, job lists no skills, no preferences) is dropped and the remaining
+weights renormalised; the breakdown returned to the UI includes the effective weights and plain-language reasons.
+Scores are computed **live** for whatever the user is viewing, and **precomputed** into `job_matches`
+(threshold 35, top 300 per user) for recommendations, sort=MATCH and the daily digest: rebuilt from nearest
+neighbours + skill overlap when a profile changes, and extended every minute for newly ingested jobs.
+
+**Consumers** are idempotent (processed_events) and transactional; a record that keeps failing is retried with
+exponential backoff, then parked on `<topic>.DLT` so it can't block its partition. Stale `ProfileUpdated` versions
+are ignored.
+
+**Daily digest:** 08:00 Asia/Kolkata, each user's top ≤ 10 new matches scoring ≥ 60 → `DailyMatchDigest`; a match
+appears in at most one digest.
 
 ### 4.5 `referral` — referral-service
 
