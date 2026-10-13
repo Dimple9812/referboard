@@ -1,0 +1,88 @@
+server:
+  port: ${PORT:8081}
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/referboard?currentSchema=auth,public}
+    username: ${DB_USERNAME:auth_svc}
+    password: ${DB_PASSWORD:auth_svc}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: auth
+        jdbc.time_zone: UTC
+  flyway:
+    schemas: auth
+    default-schema: auth
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        linger.ms: 5
+        # Fail fast when Kafka is down: the outbox keeps the event and the relay retries next tick.
+        max.block.ms: 5000
+        delivery.timeout.ms: 15000
+        request.timeout.ms: 10000
+
+eureka:
+  client:
+    enabled: ${EUREKA_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+referboard:
+  auth:
+    jwt:
+      issuer: ${JWT_ISSUER:referboard-auth}
+      audience: ${JWT_AUDIENCE:referboard}
+      access-token-ttl: ${JWT_ACCESS_TTL:PT15M}
+      refresh-token-ttl: ${JWT_REFRESH_TTL:P30D}
+      # PEM (PKCS#8 private, X.509 public), raw or base64-encoded. If unset, a key pair is generated
+      # once and persisted under key-dir so tokens survive restarts in local dev.
+      private-key: ${JWT_PRIVATE_KEY:}
+      public-key: ${JWT_PUBLIC_KEY:}
+      key-dir: ${JWT_KEY_DIR:./.keys}
+    google:
+      client-id: ${GOOGLE_CLIENT_ID:}
+      jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+    refresh-cookie:
+      name: rb_refresh
+      path: /api/auth
+      secure: ${AUTH_COOKIE_SECURE:true}
+      same-site: Strict
+    lockout:
+      max-failed-attempts: 5
+      duration: PT15M
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    correlation: "[%X{correlationId:-}] "

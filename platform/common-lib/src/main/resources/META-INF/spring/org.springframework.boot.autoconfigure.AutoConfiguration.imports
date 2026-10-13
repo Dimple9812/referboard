@@ -1,0 +1,2 @@
+com.referboard.common.autoconfigure.CommonWebAutoConfiguration
+com.referboard.common.autoconfigure.CommonEventsAutoConfiguration
