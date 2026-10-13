@@ -1,2 +1,3 @@
 com.referboard.common.autoconfigure.CommonWebAutoConfiguration
 com.referboard.common.autoconfigure.CommonEventsAutoConfiguration
+com.referboard.common.autoconfigure.ResourceServerAutoConfiguration

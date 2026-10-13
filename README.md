@@ -23,11 +23,13 @@ flowchart LR
 |---|---|---|
 | event-contracts | ✅ | contract round-trip + forward compatibility |
 | common-lib | ✅ | correlation-id sanitising |
-| test-support | ✅ | (fixture) |
+| test-support | ✅ | (fixtures: Postgres+pgvector, test JWTs) |
+| skills | ✅ | 7 — aliases (K8s→Kubernetes), ambiguous words ("Go", "Excel"), extraction offsets |
+| ai-client | ✅ | 9 — Claude/OpenAI request shape, retries on 429/5xx/529, no retry on 4xx, embeddings |
 | discovery-server | ✅ | boots, health UP |
 | auth-service | ✅ | 15 unit + 7 integration (real Postgres, embedded Kafka) |
-| profile-service | ⏳ next | |
-| ingestion-service | ⏳ | |
+| profile-service | ✅ | 21 unit + 4 integration (real PDF/DOCX → parse → pgvector → Kafka) |
+| ingestion-service | ⏳ next | |
 | job-service | ⏳ | |
 | referral-service | ⏳ | |
 | resume-analyzer-service | ⏳ | |
@@ -49,6 +51,7 @@ docker compose --profile tools up kafka-ui   # optional Kafka UI on :8090
 | http://localhost:8761 | Eureka dashboard |
 | http://localhost:8081/swagger-ui.html | auth-service API docs |
 | http://localhost:8081/.well-known/jwks.json | public signing keys |
+| http://localhost:8082/swagger-ui.html | profile-service API docs |
 
 Try it:
 
@@ -57,7 +60,26 @@ curl -i -X POST localhost:8081/api/auth/signup -H 'Content-Type: application/jso
   -d '{"email":"you@example.com","password":"Passw0rdOK","fullName":"You"}'
 # → 201, body has accessToken; refresh token is in the rb_refresh httpOnly cookie
 curl localhost:8081/api/auth/me -H "Authorization: Bearer <accessToken>"
+
+# upload a resume (PDF/DOCX/DOC/TXT ≤ 5 MB); parsing runs in the background
+curl -X POST localhost:8082/api/profile/resumes -H "Authorization: Bearer <accessToken>" -F "file=@my-cv.pdf"
+curl localhost:8082/api/profile/resumes/<id> -H "Authorization: Bearer <accessToken>"   # until parseStatus=PARSED
+curl localhost:8082/api/profile -H "Authorization: Bearer <accessToken>"                # structured profile
 ```
+
+### AI providers (optional)
+
+Everything runs without API keys. With none set, resumes are parsed by a deterministic heuristic parser and
+embeddings use a local hashing model, so matching works but is cruder, and the profile is marked
+`parseSource: HEURISTIC` so the UI asks the user to review it. Add keys to `.env` for the real thing:
+
+| Setting | Effect |
+|---|---|
+| `ANTHROPIC_API_KEY` | resume (and later JD) parsing and message drafting with Claude (`ANTHROPIC_MODEL`, default `claude-sonnet-5-5`) |
+| `OPENAI_API_KEY` | embeddings (`text-embedding-3-small`, 1536-d); also used for parsing if no Anthropic key |
+| `LLM_PROVIDER` / `EMBEDDING_PROVIDER` | force `anthropic`/`openai`/`none` and `openai`/`hashing` instead of `auto` |
+
+After adding a key, `POST /api/profile/resumes/{id}/reparse` re-parses an existing resume.
 
 ## Run tests
 
@@ -92,6 +114,13 @@ comments. The ones that matter today:
 | `KAFKA_BOOTSTRAP_SERVERS` | each service | |
 | `EUREKA_URL` | each service | |
 | `LOG_FORMAT` | each service | `ecs` for structured JSON logs; empty for plain text |
+
+## Adding skills to the taxonomy
+
+Skill names are normalised everywhere (profiles, jobs, JD analysis) through
+`platform/skills/src/main/resources/referboard/skills.yml`. Add an entry with its aliases; words that are also
+ordinary English ("Go", "Excel", "Spring") go under `strict:` so they only match when written exactly that way in
+free text. `SkillTaxonomyTest` fails on alias collisions.
 
 ## Adding companies to the job seed list
 

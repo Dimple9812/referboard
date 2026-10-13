@@ -1,0 +1,173 @@
+# Canonical skill → aliases. `aliases` match case-insensitively on word boundaries.
+# `strict` forms are ordinary English words too ("Go", "C", "Excel"); in free text they match only when written
+# exactly as listed, but they still normalise case-insensitively when they appear in a structured skills list.
+# Keep canonical names lowercase; `display` is what the UI shows.
+# To add a skill: append an entry; aliases must not collide with another skill's canonical name or aliases.
+skills:
+  # --- languages ---
+  - { name: java, display: Java, category: language, aliases: [java se, java ee, core java] }
+  - { name: kotlin, display: Kotlin, category: language }
+  - { name: scala, display: Scala, category: language }
+  - { name: python, display: Python, category: language, aliases: [python3] }
+  - { name: javascript, display: JavaScript, category: language, aliases: [js, ecmascript, es6, es2015, vanilla js] }
+  - { name: typescript, display: TypeScript, category: language, strict: [TS] }
+  - { name: go, display: Go, category: language, aliases: [golang], strict: [Go] }
+  - { name: rust, display: Rust, category: language, strict: [Rust] }
+  - { name: c++, display: C++, category: language, aliases: [cpp, cplusplus] }
+  - { name: c#, display: C#, category: language, aliases: [csharp, c sharp] }
+  - { name: c, display: C, category: language, aliases: [c language, ansi c], strict: [C] }
+  - { name: ruby, display: Ruby, category: language }
+  - { name: php, display: PHP, category: language }
+  - { name: swift, display: Swift, category: language, strict: [Swift] }
+  - { name: objective-c, display: Objective-C, category: language, aliases: [objc] }
+  - { name: dart, display: Dart, category: language }
+  - { name: r, display: R, category: language, aliases: [r language, rstudio], strict: [R] }
+  - { name: sql, display: SQL, category: language, aliases: [t-sql, pl/sql, plsql, tsql] }
+  - { name: bash, display: Bash, category: language, aliases: [shell scripting, shell script] }
+  - { name: html, display: HTML, category: language, aliases: [html5] }
+  - { name: css, display: CSS, category: language, aliases: [css3] }
+  - { name: graphql, display: GraphQL, category: language }
+  - { name: solidity, display: Solidity, category: language }
+
+  # --- backend frameworks ---
+  - { name: spring boot, display: Spring Boot, category: framework, aliases: [springboot, spring-boot] }
+  - { name: spring, display: Spring Framework, category: framework, aliases: [spring framework, spring mvc, spring core], strict: [Spring] }
+  - { name: spring cloud, display: Spring Cloud, category: framework }
+  - { name: spring security, display: Spring Security, category: framework }
+  - { name: hibernate, display: Hibernate, category: framework, aliases: [jpa, spring data jpa] }
+  - { name: microservices, display: Microservices, category: architecture, aliases: [microservice, micro-services, microservice architecture] }
+  - { name: rest api, display: REST APIs, category: architecture, aliases: [restful, restful apis, rest apis, restful services, rest api], strict: [REST] }
+  - { name: grpc, display: gRPC, category: architecture }
+  - { name: node.js, display: Node.js, category: framework, aliases: [nodejs], strict: [Node] }
+  - { name: express, display: Express, category: framework, aliases: [express.js, expressjs], strict: [Express] }
+  - { name: nestjs, display: NestJS, category: framework, aliases: [nest.js] }
+  - { name: django, display: Django, category: framework }
+  - { name: flask, display: Flask, category: framework }
+  - { name: fastapi, display: FastAPI, category: framework }
+  - { name: ruby on rails, display: Ruby on Rails, category: framework, aliases: [ror], strict: [Rails] }
+  - { name: .net, display: .NET, category: framework, aliases: [dotnet, asp.net, .net core, asp.net core] }
+  - { name: laravel, display: Laravel, category: framework }
+  - { name: quarkus, display: Quarkus, category: framework }
+  - { name: micronaut, display: Micronaut, category: framework }
+
+  # --- frontend / mobile ---
+  - { name: react, display: React, category: frontend, aliases: [react.js, reactjs] }
+  - { name: next.js, display: Next.js, category: frontend, aliases: [nextjs] }
+  - { name: angular, display: Angular, category: frontend, aliases: [angularjs, angular.js] }
+  - { name: vue, display: Vue.js, category: frontend, aliases: [vue.js, vuejs] }
+  - { name: svelte, display: Svelte, category: frontend }
+  - { name: redux, display: Redux, category: frontend }
+  - { name: tailwind css, display: Tailwind CSS, category: frontend, aliases: [tailwind, tailwindcss] }
+  - { name: webpack, display: Webpack, category: frontend }
+  - { name: vite, display: Vite, category: frontend }
+  - { name: react native, display: React Native, category: mobile }
+  - { name: flutter, display: Flutter, category: mobile }
+  - { name: android, display: Android, category: mobile, aliases: [android sdk] }
+  - { name: ios, display: iOS, category: mobile }
+  - { name: jetpack compose, display: Jetpack Compose, category: mobile }
+  - { name: swiftui, display: SwiftUI, category: mobile }
+
+  # --- data stores ---
+  - { name: postgresql, display: PostgreSQL, category: database, aliases: [postgres, psql] }
+  - { name: mysql, display: MySQL, category: database }
+  - { name: mariadb, display: MariaDB, category: database }
+  - { name: oracle database, display: Oracle DB, category: database, aliases: [oracle db], strict: [Oracle] }
+  - { name: sql server, display: SQL Server, category: database, aliases: [mssql, ms sql, microsoft sql server] }
+  - { name: mongodb, display: MongoDB, category: database, aliases: [mongo] }
+  - { name: redis, display: Redis, category: database }
+  - { name: cassandra, display: Cassandra, category: database, aliases: [apache cassandra] }
+  - { name: dynamodb, display: DynamoDB, category: database, aliases: [dynamo db] }
+  - { name: elasticsearch, display: Elasticsearch, category: database, aliases: [elastic search, elk, opensearch] }
+  - { name: neo4j, display: Neo4j, category: database }
+  - { name: sqlite, display: SQLite, category: database }
+  - { name: snowflake, display: Snowflake, category: data }
+  - { name: bigquery, display: BigQuery, category: data, aliases: [big query] }
+  - { name: redshift, display: Redshift, category: data, aliases: [amazon redshift] }
+  - { name: clickhouse, display: ClickHouse, category: database }
+  - { name: pgvector, display: pgvector, category: database }
+
+  # --- messaging / streaming ---
+  - { name: kafka, display: Apache Kafka, category: messaging, aliases: [apache kafka, kafka streams] }
+  - { name: rabbitmq, display: RabbitMQ, category: messaging, aliases: [rabbit mq] }
+  - { name: activemq, display: ActiveMQ, category: messaging }
+  - { name: aws sqs, display: AWS SQS, category: messaging, aliases: [sqs] }
+  - { name: pulsar, display: Apache Pulsar, category: messaging, aliases: [apache pulsar] }
+
+  # --- cloud / devops ---
+  - { name: aws, display: AWS, category: cloud, aliases: [amazon web services] }
+  - { name: gcp, display: Google Cloud, category: cloud, aliases: [google cloud, google cloud platform] }
+  - { name: azure, display: Azure, category: cloud, aliases: [microsoft azure] }
+  - { name: aws lambda, display: AWS Lambda, category: cloud, strict: [Lambda] }
+  - { name: aws ec2, display: AWS EC2, category: cloud, aliases: [ec2] }
+  - { name: aws s3, display: AWS S3, category: cloud, strict: [S3] }
+  - { name: docker, display: Docker, category: devops, aliases: [containerization] }
+  - { name: kubernetes, display: Kubernetes, category: devops, aliases: [k8s, eks, gke, aks] }
+  - { name: helm, display: Helm, category: devops, strict: [Helm] }
+  - { name: terraform, display: Terraform, category: devops }
+  - { name: ansible, display: Ansible, category: devops }
+  - { name: jenkins, display: Jenkins, category: devops }
+  - { name: github actions, display: GitHub Actions, category: devops }
+  - { name: gitlab ci, display: GitLab CI, category: devops, aliases: [gitlab ci/cd] }
+  - { name: ci/cd, display: CI/CD, category: devops, aliases: [cicd, continuous integration, continuous delivery, continuous deployment] }
+  - { name: linux, display: Linux, category: devops, aliases: [unix] }
+  - { name: nginx, display: Nginx, category: devops }
+  - { name: prometheus, display: Prometheus, category: observability }
+  - { name: grafana, display: Grafana, category: observability }
+  - { name: datadog, display: Datadog, category: observability }
+  - { name: opentelemetry, display: OpenTelemetry, category: observability, aliases: [otel] }
+  - { name: git, display: Git, category: tools, aliases: [github, gitlab, bitbucket] }
+  - { name: maven, display: Maven, category: tools }
+  - { name: gradle, display: Gradle, category: tools }
+
+  # --- testing ---
+  - { name: junit, display: JUnit, category: testing, aliases: [junit5, junit 5] }
+  - { name: mockito, display: Mockito, category: testing }
+  - { name: testcontainers, display: Testcontainers, category: testing }
+  - { name: jest, display: Jest, category: testing }
+  - { name: cypress, display: Cypress, category: testing }
+  - { name: playwright, display: Playwright, category: testing }
+  - { name: selenium, display: Selenium, category: testing }
+  - { name: pytest, display: pytest, category: testing }
+  - { name: unit testing, display: Unit testing, category: testing, aliases: [tdd, test driven development] }
+
+  # --- data / ML / AI ---
+  - { name: machine learning, display: Machine Learning, category: ml, strict: [ML] }
+  - { name: deep learning, display: Deep Learning, category: ml }
+  - { name: nlp, display: NLP, category: ml, aliases: [natural language processing] }
+  - { name: computer vision, display: Computer Vision, category: ml, aliases: [opencv] }
+  - { name: llm, display: LLMs, category: ml, aliases: [llms, large language models, generative ai, genai, gen ai] }
+  - { name: rag, display: RAG, category: ml, aliases: [retrieval augmented generation] }
+  - { name: pytorch, display: PyTorch, category: ml }
+  - { name: tensorflow, display: TensorFlow, category: ml }
+  - { name: scikit-learn, display: scikit-learn, category: ml, aliases: [sklearn] }
+  - { name: pandas, display: pandas, category: data }
+  - { name: numpy, display: NumPy, category: data }
+  - { name: spark, display: Apache Spark, category: data, aliases: [apache spark, pyspark], strict: [Spark] }
+  - { name: hadoop, display: Hadoop, category: data }
+  - { name: airflow, display: Airflow, category: data, aliases: [apache airflow] }
+  - { name: dbt, display: dbt, category: data }
+  - { name: etl, display: ETL, category: data, aliases: [elt, data pipelines, data pipeline] }
+  - { name: tableau, display: Tableau, category: data }
+  - { name: power bi, display: Power BI, category: data, aliases: [powerbi] }
+  - { name: excel, display: Excel, category: data, aliases: [ms excel, microsoft excel], strict: [Excel] }
+  - { name: statistics, display: Statistics, category: data, strict: [Statistics] }
+
+  # --- architecture / practices ---
+  - { name: system design, display: System Design, category: architecture, aliases: [distributed systems, scalable systems] }
+  - { name: data structures, display: Data Structures & Algorithms, category: fundamentals, aliases: [dsa, algorithms, data structures and algorithms] }
+  - { name: oop, display: OOP, category: fundamentals, aliases: [object oriented programming, object-oriented programming, ood] }
+  - { name: design patterns, display: Design Patterns, category: fundamentals }
+  - { name: multithreading, display: Multithreading, category: fundamentals, aliases: [concurrency, multi-threading] }
+  - { name: event-driven architecture, display: Event-driven architecture, category: architecture, aliases: [event driven, event sourcing, cqrs] }
+  - { name: caching, display: Caching, category: architecture, strict: [Caching] }
+  - { name: api design, display: API Design, category: architecture }
+  - { name: oauth2, display: OAuth 2.0, category: security, aliases: [oauth, oauth 2.0, openid connect, oidc] }
+  - { name: jwt, display: JWT, category: security }
+  - { name: application security, display: Application Security, category: security, aliases: [owasp, appsec] }
+  - { name: agile, display: Agile, category: process, aliases: [scrum] }
+  - { name: jira, display: Jira, category: tools }
+
+  # --- product / design ---
+  - { name: figma, display: Figma, category: design }
+  - { name: product management, display: Product Management, category: product }
+  - { name: a/b testing, display: A/B testing, category: product, aliases: [ab testing, experimentation] }

@@ -75,6 +75,8 @@ flowchart LR
 | Reliable publishing | **Transactional outbox** (common-lib) + relay with `FOR UPDATE SKIP LOCKED` | No lost events when Kafka is down; no phantom events on rollback; safe with multiple replicas. |
 | Idempotent consumers | `processed_events(event_id)` insert-if-absent inside the consumer transaction | At-least-once delivery becomes effectively-once processing. |
 | Embeddings | pgvector `vector(1536)`, HNSW index, cosine distance | Matching runs in SQL next to the filters; no extra vector DB. |
+| LLM access | `ai-client` module: forced tool call (Claude) / `json_schema` (OpenAI) for structured output, retry on 429/5xx/529 only | Output is schema-checked JSON, not free text to regex. Every LLM feature has a deterministic fallback, so the platform works keyless and degrades instead of failing. Prompts treat user documents as data. |
+| Skill vocabulary | One taxonomy (`skills.yml`) shared by profile, jobs and the analyzer | "K8s" on a resume and "Kubernetes" in a JD must be the same skill everywhere, or match scores lie. |
 | Timezone | All JVMs and DB sessions in **UTC**; UI renders in `Asia/Kolkata` or the user's zone | Also avoids PostgreSQL rejecting the legacy JVM id `Asia/Calcutta`. |
 | Tracker | Kept as its own service | resume-analyzer and referral both feed it via events; analytics in Phase 3 reads from it. |
 
@@ -85,8 +87,12 @@ referboard/                         parent POM (Spring Boot 3.5.x, Spring Cloud 
 ├── platform/
 │   ├── event-contracts/            Topics + event records (no Spring dependency)
 │   ├── common-lib/                 auto-config: ApiError + global handler, correlation id filter,
-│   │                               JWT resource-server defaults, outbox publisher/relay, processed-event store
-│   └── test-support/               PostgreSQL+pgvector for ITs (Testcontainers, or a local server)
+│   │                               JWT resource-server (JWKS + iss + aud), outbox publisher/relay,
+│   │                               processed-event store
+│   ├── skills/                     skill taxonomy: canonical names, aliases, extraction from free text
+│   ├── ai-client/                  LlmClient (Claude / OpenAI structured output), EmbeddingClient,
+│   │                               retries, offline fallbacks
+│   └── test-support/               PostgreSQL+pgvector for ITs (Testcontainers or local), TestJwt
 ├── infrastructure/
 │   ├── discovery-server/           Eureka
 │   └── api-gateway/                Spring Cloud Gateway (reactive)
@@ -139,35 +145,46 @@ refresh_tokens (
   index (user_id), (family_id), (expires_at)
 ```
 
-### 4.2 `profile` — profile-service
+### 4.2 `profile` — profile-service ✅ implemented
 
 ```sql
 resumes (
-  id, user_id, file_name, content_type, size_bytes, sha256, storage_key,      -- file lives on disk/S3
-  extracted_text text, parse_status ('PENDING'|'PARSED'|'FAILED'), parse_error,
-  is_primary bool, created_at, updated_at, deleted_at)
-  index (user_id) where deleted_at is null; unique (user_id) where is_primary and deleted_at is null
+  id, user_id, file_name, content_type, size_bytes, sha256, storage_key,      -- file on disk / S3
+  extracted_text, parse_status ('PENDING'|'PARSED'|'FAILED'), parse_error,
+  parser ('LLM'|'HEURISTIC'), parser_model, parsed_json jsonb, parsed_at,      -- raw parse kept for the analyzer
+  is_primary, created_at, updated_at, deleted_at)
+  index (user_id, created_at desc) where deleted_at is null
+  unique (user_id) where is_primary and deleted_at is null                     -- one primary per user
 
 profiles (
-  user_id pk, headline, summary, current_title, current_company, location,
-  total_experience_years numeric(4,1), college, highest_degree,
+  user_id pk, full_name, email, phone, headline, summary, current_title, current_company, location,
+  total_experience_years numeric(4,1),            -- computed from dated roles, overlaps merged; never from the LLM
+  college, highest_degree, links jsonb, certifications jsonb,
+  parse_source ('LLM'|'HEURISTIC'|'MANUAL'), primary_resume_id,
   profile_version bigint,                          -- bumped on every change, carried in ProfileUpdated
-  embedding vector(1536), embedding_model, created_at, updated_at)
+  embedding vector(1536), embedding_model, embedding_version,   -- embedding_version = profile_version it encodes
+  created_at, updated_at, version)
 
-profile_skills (id, user_id, name, normalized_name, years numeric(4,1), source ('PARSED'|'USER'),
-  evidence ('BULLET'|'SKILLS_LIST'), created_at)
-  unique (user_id, normalized_name)
+profile_skills (id, user_id fk, name /* canonical */, display_name, years numeric(4,1),
+  source ('PARSED'|'USER'), evidence ('BULLET'|'SKILLS_LIST'), sort_order, created_at)
+  unique (user_id, name)
 
-experiences (id, user_id, company, title, location, start_date, end_date, is_current,
+experiences (id, user_id fk, company, title, location, start_date, end_date, is_current,
   description, bullets jsonb, sort_order, created_at, updated_at)
   index (user_id, sort_order)
 
-educations (id, user_id, institution, degree, field_of_study, start_year, end_year, grade, sort_order)
+educations (id, user_id fk, institution, degree, field_of_study, start_year, end_year, grade, sort_order)
 
-job_preferences (user_id pk, roles text[], locations text[], remote_only bool, open_to_remote bool,
-  min_salary_inr bigint, experience_level ('INTERN'|'ENTRY'|'MID'|'SENIOR'|'LEAD'|'PRINCIPAL'),
-  updated_at)
+job_preferences (user_id pk, roles jsonb, locations jsonb, remote_only, open_to_remote,
+  min_salary_inr bigint, experience_level ('INTERN'|'ENTRY'|'MID'|'SENIOR'|'LEAD'|'PRINCIPAL'), updated_at)
 ```
+
+**Resume pipeline:** upload (type sniffed from bytes, not the extension; SHA-256 de-dup; 10 per user) → 202 →
+after commit, async: Tika text extraction → LLM parse with a JSON schema (or heuristic fallback) → stored → if
+primary, the profile's resume-derived parts are rebuilt (experiences, education, PARSED skills); USER skills and
+preferences are kept. **Sync:** after every profile commit the embedding is computed outside any transaction,
+then stored and `ProfileUpdated` published in one transaction *only if `profile_version` is unchanged*, so a
+burst of edits never publishes a stale event.
 
 ### 4.3 `ingestion` — ingestion-service
 

@@ -22,8 +22,11 @@
         <module>platform/event-contracts</module>
         <module>platform/common-lib</module>
         <module>platform/test-support</module>
+        <module>platform/skills</module>
+        <module>platform/ai-client</module>
         <module>infrastructure/discovery-server</module>
         <module>services/auth-service</module>
+        <module>services/profile-service</module>
     </modules>
 
     <properties>
@@ -32,7 +35,8 @@
         <springdoc.version>2.8.17</springdoc.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
-        <tika.version>3.2.3</tika.version>
+        <tika.version>3.3.2</tika.version>
+        <awssdk.version>2.55.15</awssdk.version>
         <pgvector.version>0.1.6</pgvector.version>
         <poi.version>5.4.1</poi.version>
         <openpdf.version>2.0.5</openpdf.version>
@@ -50,6 +54,13 @@
                 <scope>import</scope>
             </dependency>
             <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${awssdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
                 <groupId>com.referboard</groupId>
                 <artifactId>event-contracts</artifactId>
                 <version>${project.version}</version>
@@ -57,6 +68,16 @@
             <dependency>
                 <groupId>com.referboard</groupId>
                 <artifactId>common-lib</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.referboard</groupId>
+                <artifactId>skills</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.referboard</groupId>
+                <artifactId>ai-client</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -6,17 +6,13 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import com.referboard.common.security.JwtValidation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
-import org.springframework.security.oauth2.core.OAuth2TokenValidator;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 
@@ -34,7 +30,6 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
-import java.util.List;
 
 /**
  * RS256 signing keys. auth-service is the only holder of the private key; the gateway and every other service
@@ -76,12 +71,8 @@ public class JwtKeyConfig {
     /** auth-service validates its own access tokens (for /me) locally, without an HTTP round trip. */
     @Bean
     public JwtDecoder jwtDecoder(RSAKey signingKey, AuthProperties props) throws Exception {
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(signingKey.toRSAPublicKey()).build();
-        OAuth2TokenValidator<Jwt> audience = new JwtClaimValidator<List<String>>("aud",
-                aud -> aud != null && aud.contains(props.jwt().audience()));
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(props.jwt().issuer()), audience));
-        return decoder;
+        return JwtValidation.withValidators(NimbusJwtDecoder.withPublicKey(signingKey.toRSAPublicKey()).build(),
+                props.jwt().issuer(), props.jwt().audience());
     }
 
     static KeyPair loadKeyPair(AuthProperties.Jwt jwt) throws GeneralSecurityException, IOException {

@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/root/.m2 \
 
 FROM eclipse-temurin:21-jre
 RUN groupadd --system app && useradd --system --gid app --home /app app \
- && mkdir -p /data && chown app:app /data
+ && mkdir -p /data/keys /data/resumes && chown -R app:app /data
 WORKDIR /app
 COPY --from=build /extracted/dependencies/ ./
 COPY --from=build /extracted/spring-boot-loader/ ./

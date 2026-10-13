@@ -1,0 +1,52 @@
+{
+  "type": "object",
+  "properties": {
+    "fullName": { "type": ["string", "null"] },
+    "email": { "type": ["string", "null"] },
+    "phone": { "type": ["string", "null"] },
+    "location": { "type": ["string", "null"], "description": "City/region as written, e.g. 'Bengaluru, India'" },
+    "headline": { "type": ["string", "null"], "description": "The resume's own one-line title/headline if present, else the most recent job title" },
+    "summary": { "type": ["string", "null"], "description": "Profile/summary/objective section text, verbatim or lightly cleaned" },
+    "skills": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Every skill, tool, language and technology explicitly named anywhere in the resume"
+    },
+    "experiences": {
+      "type": "array",
+      "description": "Jobs and internships, most recent first",
+      "items": {
+        "type": "object",
+        "properties": {
+          "company": { "type": "string" },
+          "title": { "type": "string" },
+          "location": { "type": ["string", "null"] },
+          "startDate": { "type": ["string", "null"], "description": "YYYY-MM; use -01 if only the year is given" },
+          "endDate": { "type": ["string", "null"], "description": "YYYY-MM, or null if current" },
+          "isCurrent": { "type": "boolean" },
+          "description": { "type": ["string", "null"] },
+          "bullets": { "type": "array", "items": { "type": "string" }, "description": "Achievement bullets verbatim" }
+        },
+        "required": ["company", "title", "isCurrent", "bullets"]
+      }
+    },
+    "educations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "institution": { "type": "string" },
+          "degree": { "type": ["string", "null"] },
+          "fieldOfStudy": { "type": ["string", "null"] },
+          "startYear": { "type": ["integer", "null"] },
+          "endYear": { "type": ["integer", "null"] },
+          "grade": { "type": ["string", "null"], "description": "CGPA/percentage as written" }
+        },
+        "required": ["institution"]
+      }
+    },
+    "certifications": { "type": "array", "items": { "type": "string" } },
+    "links": { "type": "array", "items": { "type": "string" }, "description": "LinkedIn, GitHub, portfolio URLs" }
+  },
+  "required": ["skills", "experiences", "educations", "certifications", "links"]
+}

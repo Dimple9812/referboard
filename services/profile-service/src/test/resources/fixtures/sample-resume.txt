@@ -1,0 +1,29 @@
+Priya Sharma
+Bengaluru, India | priya.sharma@example.com | +91 98765 43210
+linkedin.com/in/priya-sharma-dev | github.com/priyasharma
+
+Summary
+Backend engineer with 4+ years building payment and lending platforms on Java and Spring Boot.
+
+Experience
+Senior Software Engineer | Razorpay
+Jan 2023 - Present
+Bengaluru
+• Built Spring Boot microservices for the settlements platform processing 2M+ transactions/day
+• Migrated batch reconciliation to Kafka streams, cutting settlement latency from 4h to 20 min
+• Led the move to Kubernetes (EKS) with Helm charts and GitHub Actions CI/CD
+
+Software Engineer at Flipkart
+Jul 2020 - Dec 2022
+• Developed REST APIs in Java for the seller onboarding service backed by PostgreSQL and Redis
+• Wrote JUnit and Mockito tests, raising coverage from 45% to 80%
+
+Education
+Indian Institute of Technology, Roorkee
+B.Tech in Computer Science, 2016 - 2020, CGPA: 8.4/10
+
+Skills
+Java, Spring Boot, Microservices, Kafka, PostgreSQL, Redis, Docker, K8s, AWS, Python, React
+
+Certifications
+AWS Certified Developer – Associate
