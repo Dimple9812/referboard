@@ -14,7 +14,9 @@ import java.util.UUID;
  * second source therefore updates the same row instead of creating a duplicate.
  *
  * @param contentHash  SHA-256 of the normalized content; job-service skips writes when unchanged
- * @param ghostJobSuspected true when the same dedup key has been reposted continuously for 60+ days
+ * @param embedding    null when the content didn't change (flag-only update) or embedding failed: consumers keep any
+ *                     vector they already hold for this job if {@code contentHash} matches, else store none
+ * @param ghostJobSuspected true when the same dedup key has been listed for 60+ days since first seen
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record JobUpsertedEvent(

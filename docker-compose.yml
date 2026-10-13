@@ -139,6 +139,31 @@ services:
       discovery-server: { condition: service_healthy }
       auth-service: { condition: service_started }
 
+  ingestion-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args: { MODULE: services/ingestion-service }
+    ports: ["8084:8084"]
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/referboard?currentSchema=ingestion,public
+      DB_USERNAME: ${INGESTION_DB_USERNAME:-ingestion_svc}
+      DB_PASSWORD: ${INGESTION_DB_PASSWORD:-ingestion_svc}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-auto}
+      ADZUNA_APP_ID: ${ADZUNA_APP_ID:-}
+      ADZUNA_APP_KEY: ${ADZUNA_APP_KEY:-}
+      INGESTION_CRON: ${INGESTION_CRON:-0 0 */6 * * *}
+      INGESTION_USER_AGENT: ${INGESTION_USER_AGENT:-ReferBoardBot/0.1 (+https://github.com/your-org/referboard)}
+      # Local dev: seed fictional sample jobs and run once on startup so the app has data immediately.
+      INGESTION_SAMPLE_DATA: ${INGESTION_SAMPLE_DATA:-true}
+      INGESTION_RUN_ON_STARTUP: ${INGESTION_RUN_ON_STARTUP:-true}
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+
 volumes:
   resumes:
   pgdata:

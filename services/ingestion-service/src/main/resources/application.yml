@@ -1,0 +1,132 @@
+server:
+  port: ${PORT:8084}
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+spring:
+  application:
+    name: ingestion-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/referboard?currentSchema=ingestion,public}
+    username: ${DB_USERNAME:ingestion_svc}
+    password: ${DB_PASSWORD:ingestion_svc}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: ingestion
+        jdbc.time_zone: UTC
+        jdbc.batch_size: 100
+        order_inserts: true
+        order_updates: true
+  flyway:
+    schemas: ingestion
+    default-schema: ingestion
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      compression-type: zstd          # job payloads are text-heavy
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        delivery.timeout.ms: 30000
+        request.timeout.ms: 15000
+        max.request.size: 2097152
+
+eureka:
+  client:
+    enabled: ${EUREKA_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+referboard:
+  security:
+    jwt:
+      jwk-set-uri: ${JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+      issuer: ${JWT_ISSUER:referboard-auth}
+      audience: ${JWT_AUDIENCE:referboard}
+  ai:
+    llm:
+      provider: none        # ingestion needs embeddings only
+    embedding:
+      provider: ${EMBEDDING_PROVIDER:auto}
+      model: ${EMBEDDING_MODEL:text-embedding-3-small}
+      dimensions: 1536
+      api-key: ${OPENAI_API_KEY:}
+  outbox:
+    batch-size: 200
+  ingestion:
+    cron: ${INGESTION_CRON:0 0 */6 * * *}
+    run-on-startup: ${INGESTION_RUN_ON_STARTUP:false}
+    user-agent: ${INGESTION_USER_AGENT:ReferBoardBot/0.1 (+https://github.com/your-org/referboard)}
+    seed-file: ${INGESTION_SEED_FILE:classpath:companies.yml}
+    max-concurrent-sources: 4
+    requests-per-second-per-host: 2
+    retry-max-attempts: 4            # 429 / 5xx / network errors; exponential backoff with jitter
+    retry-initial-backoff: PT2S
+    close-after: P7D
+    ghost-after: P60D
+    retry-not-found-after: P7D
+    filters:
+      countries: [IN]
+      include-remote: true
+      tech-roles-only: true
+    greenhouse:
+      enabled: true
+      base-url: https://boards-api.greenhouse.io
+    lever:
+      enabled: true
+      base-url: https://api.lever.co
+    ashby:
+      enabled: true
+      base-url: https://api.ashbyhq.com
+    adzuna:
+      enabled: ${ADZUNA_ENABLED:true}       # skipped automatically when keys are missing
+      base-url: https://api.adzuna.com
+      app-id: ${ADZUNA_APP_ID:}
+      app-key: ${ADZUNA_APP_KEY:}
+      country: in
+      max-days-old: 14
+      pages-per-query: 2
+      results-per-page: 50
+      queries:
+        - software engineer
+        - backend developer
+        - frontend developer
+        - full stack developer
+        - data engineer
+        - devops engineer
+        - machine learning engineer
+        - android developer
+    sample:
+      enabled: ${INGESTION_SAMPLE_DATA:false}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    correlation: "[%X{correlationId:-}] "

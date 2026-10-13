@@ -1,0 +1,61 @@
+{
+ "count": 2,
+ "mean": 1500000,
+ "results": [
+  {
+   "id": "50001",
+   "title": "Sr. Backend Engineer - Bangalore",
+   "created": "2026-10-05T09:00:00Z",
+   "redirect_url": "https://www.adzuna.in/land/ad/50001",
+   "description": "Acme Pay is hiring a backend engineer with Java and Kafka…",
+   "company": {
+    "display_name": "AcmePay Technologies Private Limited"
+   },
+   "location": {
+    "display_name": "Bangalore, Karnataka",
+    "area": [
+     "India",
+     "Karnataka",
+     "Bangalore"
+    ]
+   },
+   "category": {
+    "label": "IT Jobs",
+    "tag": "it-jobs"
+   },
+   "contract_time": "full_time",
+   "salary_min": 2400000,
+   "salary_max": 3600000
+  },
+  {
+   "id": "50002",
+   "title": "Android Developer",
+   "created": "2026-10-06T09:00:00Z",
+   "redirect_url": "https://www.adzuna.in/land/ad/50002",
+   "description": "Kotlin, Jetpack Compose. Build our consumer app.",
+   "company": {
+    "display_name": "Kite Mobility"
+   },
+   "location": {
+    "display_name": "Hyderabad, Telangana",
+    "area": [
+     "India"
+    ]
+   },
+   "category": {
+    "label": "IT Jobs"
+   },
+   "contract_time": "full_time"
+  },
+  {
+   "id": "50003",
+   "title": "Java Developer",
+   "created": "2026-10-06T09:00:00Z",
+   "redirect_url": "https://www.adzuna.in/land/ad/50003",
+   "description": "Confidential client.",
+   "location": {
+    "display_name": "Chennai"
+   }
+  }
+ ]
+}

@@ -186,25 +186,43 @@ preferences are kept. **Sync:** after every profile commit the embedding is comp
 then stored and `ProfileUpdated` published in one transaction *only if `profile_version` is unchanged*, so a
 burst of edits never publishes a stale event.
 
-### 4.3 `ingestion` — ingestion-service
+### 4.3 `ingestion` — ingestion-service ✅ implemented
 
 ```sql
-company_sources (id, slug, name, ats_type ('GREENHOUSE'|'LEVER'|'ASHBY'), enabled,
-  last_fetched_at, last_status, last_error, consecutive_failures, created_at, updated_at)
-  unique (ats_type, slug)                         -- seeded from companies.yml on startup
+sources (                                         -- one row per fetchable thing
+  source_key pk,                                  -- greenhouse:acme · lever:acme · ashby:acme · adzuna:in:<query> · sample:demo
+  source_type ('GREENHOUSE'|'LEVER'|'ASHBY'|'ADZUNA'|'SAMPLE'), slug, display_name, enabled,
+  status ('NEW'|'OK'|'FAILING'|'NOT_FOUND'|'BLOCKED'),
+  last_attempt_at, last_success_at, last_error, consecutive_failures, last_job_count, created_at, updated_at)
+  -- synced from companies.yml + configured Adzuna queries on startup; health survives YAML edits
 
-ingestion_runs (id, source, started_at, finished_at, status ('RUNNING'|'SUCCEEDED'|'PARTIAL'|'FAILED'),
-  fetched int, created int, updated int, unchanged int, closed int, errors jsonb)
+ingestion_runs (id, trigger_type ('SCHEDULED'|'MANUAL'|'STARTUP'), started_at, finished_at,
+  status ('RUNNING'|'SUCCEEDED'|'PARTIAL'|'FAILED'), sources_ok, sources_failed,
+  fetched, kept, created, updated, unchanged, closed, errors jsonb)
 
 ingested_postings (
   job_id uuid pk,                                 -- = UUID.nameUUIDFromBytes(dedup_key)
-  dedup_key unique,                               -- lower(company)|normalized title|normalized location
-  source, source_job_id, company_slug, content_hash,
-  posted_at, first_seen_at, last_seen_at, closed_at,
-  continuous_since timestamptz,                   -- start of the current unbroken listing window
-  ghost_job_suspected bool, created_at, updated_at)
-  index (last_seen_at) where closed_at is null    -- 7-day close sweep
+  dedup_key unique,                               -- normalizedCompany | normalizedTitle | locationKey
+  source, source_key, source_job_id, company_name, title, location,
+  content_hash,                                   -- unchanged hash ⇒ no event
+  posted_at, first_seen_at, last_seen_at, closed_at, repost_count, ghost_job_suspected, embedding_model,
+  created_at, updated_at)
+  index (last_seen_at) where closed_at is null; index (source_key)
 ```
+
+**Run:** cluster-wide single run (PostgreSQL advisory lock) → due sources fetched with bounded concurrency
+through one HTTP client that enforces robots.txt (RFC 9309; unreadable ⇒ don't fetch), a per-host rate limit and
+Resilience4j retry on 429/5xx/network errors only (404 ⇒ NOT_FOUND, re-checked weekly) → normalise
+(location aliases, remote-open-to-India detection, title/company normalisation, tech-role filter, seniority,
+skills) → per-source batch: de-dup, embed only new/changed content, upsert + publish in one transaction →
+close stale postings → record run.
+
+**Source priority:** ATS boards (3) > Adzuna (2) > sample (1). A lower-priority copy of a job never overwrites,
+touches or reopens one owned by a higher-priority source; the company's own board decides whether it's open.
+
+**Closing & ghost jobs:** closed when not seen for 7 days *and* its source was read successfully after it was last
+seen (so outages close nothing); flagged `ghostJobSuspected` once first seen ≥ 60 days ago and still listed;
+reposts (posted date moving forward) are counted.
 
 ### 4.4 `job` — job-service
 

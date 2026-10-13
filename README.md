@@ -29,8 +29,8 @@ flowchart LR
 | discovery-server | ✅ | boots, health UP |
 | auth-service | ✅ | 15 unit + 7 integration (real Postgres, embedded Kafka) |
 | profile-service | ✅ | 21 unit + 4 integration (real PDF/DOCX → parse → pgvector → Kafka) |
-| ingestion-service | ⏳ next | |
-| job-service | ⏳ | |
+| ingestion-service | ✅ | 54 unit + 2 integration (4 simulated runs over 61 days against mock ATS APIs) |
+| job-service | ⏳ next | |
 | referral-service | ⏳ | |
 | resume-analyzer-service | ⏳ | |
 | tracker-service | ⏳ | |
@@ -52,6 +52,7 @@ docker compose --profile tools up kafka-ui   # optional Kafka UI on :8090
 | http://localhost:8081/swagger-ui.html | auth-service API docs |
 | http://localhost:8081/.well-known/jwks.json | public signing keys |
 | http://localhost:8082/swagger-ui.html | profile-service API docs |
+| http://localhost:8084/swagger-ui.html | ingestion admin API (ADMIN role) |
 
 Try it:
 
@@ -124,20 +125,39 @@ free text. `SkillTaxonomyTest` fails on alias collisions.
 
 ## Adding companies to the job seed list
 
-*(Lands with ingestion-service.)* Companies are listed in
-`services/ingestion-service/src/main/resources/companies.yml` and synced into `ingestion.company_sources` on
-startup:
+Boards are listed in `services/ingestion-service/src/main/resources/companies.yml` (214 to start) and synced into
+`ingestion.sources` on every startup. Editing the file never resets a source's health history.
 
 ```yaml
 companies:
-  - name: Razorpay
-    ats: GREENHOUSE      # GREENHOUSE | LEVER | ASHBY
-    slug: razorpay       # the board token in the public URL, e.g. boards.greenhouse.io/<slug>
+  - { name: "Razorpay", ats: GREENHOUSE, slug: razorpaysoftwareprivatelimited }
+  - { name: "CRED", ats: LEVER, slug: cred }
+  - { name: "Notion", ats: ASHBY, slug: notion }
+  - { name: "Paused Co", ats: ASHBY, slug: paused, enabled: false }   # stop fetching, keep history
 ```
 
-Find the slug from the company's public careers page URL (`boards.greenhouse.io/<slug>`,
-`jobs.lever.co/<slug>`, `jobs.ashbyhq.com/<slug>`). Only these documented public board APIs and Adzuna are
-called; no site whose terms prohibit automated access is ever fetched.
+The slug is the board token in the public careers URL: `boards.greenhouse.io/<slug>`, `jobs.lever.co/<slug>`,
+`jobs.ashbyhq.com/<slug>`. To point at your own list without rebuilding, set `INGESTION_SEED_FILE=file:/path/companies.yml`.
+
+**Checking the list:** slugs drift as companies rename boards or switch ATS. A board answering 404 is marked
+`NOT_FOUND`, skipped, and re-checked weekly. After a run, list the ones to fix:
+
+```bash
+curl localhost:8084/api/ingestion/sources?status=NOT_FOUND -H "Authorization: Bearer <ADMIN token>"
+curl -X POST localhost:8084/api/ingestion/runs -H "Authorization: Bearer <ADMIN token>"   # run now
+```
+
+**How ingestion behaves** (details in `docs/ARCHITECTURE.md`):
+
+- Only documented public APIs are called (Greenhouse, Lever, Ashby board APIs and Adzuna), never sites whose
+  terms prohibit it. robots.txt is honored per host; if it can't be read, the host isn't fetched.
+- Requests are rate-limited per host (default 2/s), and 429/5xx/network errors are retried with exponential
+  backoff. One failing board never fails the run.
+- Postings are kept if they're in India, or remote and open to India, and are tech roles. Duplicates across sources
+  (same company + normalized title + location) merge into one job, and the ATS copy wins over Adzuna's snippet.
+- A job closes when its board was read successfully but hasn't listed it for 7 days, so a board outage closes
+  nothing. Jobs listed for 60+ days are flagged "possible ghost job".
+- Re-running is safe: unchanged postings produce no events.
 
 ## Deployment notes
 

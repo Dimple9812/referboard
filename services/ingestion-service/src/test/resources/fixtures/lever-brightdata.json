@@ -1,0 +1,51 @@
+[
+ {
+  "id": "a1b2c3",
+  "text": "Data Engineer",
+  "categories": {
+   "commitment": "Full-time",
+   "department": "Data",
+   "location": "Pune",
+   "team": "Data Platform",
+   "allLocations": [
+    "Pune"
+   ]
+  },
+  "country": "IN",
+  "workplaceType": "hybrid",
+  "createdAt": 1790000000000,
+  "description": "<div>Pipelines with <b>Spark</b> and Airflow.</div>",
+  "descriptionPlain": "Pipelines with Spark and Airflow.",
+  "lists": [
+   {
+    "text": "Requirements",
+    "content": "<li>Python</li><li>SQL</li>"
+   }
+  ],
+  "additional": "<div>We sponsor learning.</div>",
+  "additionalPlain": "We sponsor learning.",
+  "hostedUrl": "https://jobs.lever.co/brightdata/a1b2c3",
+  "applyUrl": "https://jobs.lever.co/brightdata/a1b2c3/apply",
+  "salaryRange": {
+   "min": 2500000,
+   "max": 4000000,
+   "currency": "INR",
+   "interval": "per-year-salary"
+  }
+ },
+ {
+  "id": "d4e5f6",
+  "text": "Site Reliability Engineer",
+  "categories": {
+   "commitment": "Full-time",
+   "location": "Remote",
+   "team": "Infra"
+  },
+  "country": "US",
+  "workplaceType": "remote",
+  "createdAt": 1790000000000,
+  "description": "<p>US-based remote role. Terraform, AWS.</p>",
+  "lists": [],
+  "hostedUrl": "https://jobs.lever.co/brightdata/d4e5f6"
+ }
+]

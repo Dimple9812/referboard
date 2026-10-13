@@ -1,0 +1,227 @@
+# Companies whose public ATS job boards ReferBoard ingests (Greenhouse, Lever and Ashby public posting APIs).
+#
+#   - name: Display name shown in the app
+#     ats: GREENHOUSE | LEVER | ASHBY
+#     slug: board token from the public careers URL:
+#             boards.greenhouse.io/<slug>  ·  jobs.lever.co/<slug>  ·  jobs.ashbyhq.com/<slug>
+#     enabled: false        # optional; stop fetching without deleting history
+#
+# Slugs were compiled from companies' public careers-page URLs and could not all be verified when this list was
+# written. Companies also switch ATS vendors. That's handled at runtime: a board that returns 404 is marked
+# NOT_FOUND, skipped, and re-checked weekly. List them with  GET /api/ingestion/sources?status=NOT_FOUND
+# (ADMIN token) and fix or remove the entries here. Only these documented public board APIs are called.
+companies:
+  - { name: "Airbnb", ats: GREENHOUSE, slug: airbnb }
+  - { name: "Stripe", ats: GREENHOUSE, slug: stripe }
+  - { name: "Coinbase", ats: GREENHOUSE, slug: coinbase }
+  - { name: "Figma", ats: GREENHOUSE, slug: figma }
+  - { name: "Discord", ats: GREENHOUSE, slug: discord }
+  - { name: "GitLab", ats: GREENHOUSE, slug: gitlab }
+  - { name: "MongoDB", ats: GREENHOUSE, slug: mongodb }
+  - { name: "Databricks", ats: GREENHOUSE, slug: databricks }
+  - { name: "Cloudflare", ats: GREENHOUSE, slug: cloudflare }
+  - { name: "Datadog", ats: GREENHOUSE, slug: datadog }
+  - { name: "Twilio", ats: GREENHOUSE, slug: twilio }
+  - { name: "Okta", ats: GREENHOUSE, slug: okta }
+  - { name: "Pinterest", ats: GREENHOUSE, slug: pinterest }
+  - { name: "Dropbox", ats: GREENHOUSE, slug: dropbox }
+  - { name: "Robinhood", ats: GREENHOUSE, slug: robinhood }
+  - { name: "Lyft", ats: GREENHOUSE, slug: lyft }
+  - { name: "Reddit", ats: GREENHOUSE, slug: reddit }
+  - { name: "Instacart", ats: GREENHOUSE, slug: instacart }
+  - { name: "Gusto", ats: GREENHOUSE, slug: gusto }
+  - { name: "Brex", ats: GREENHOUSE, slug: brex }
+  - { name: "Plaid", ats: GREENHOUSE, slug: plaid }
+  - { name: "Chime", ats: GREENHOUSE, slug: chime }
+  - { name: "Affirm", ats: GREENHOUSE, slug: affirm }
+  - { name: "Asana", ats: GREENHOUSE, slug: asana }
+  - { name: "Airtable", ats: GREENHOUSE, slug: airtable }
+  - { name: "Elastic", ats: GREENHOUSE, slug: elastic }
+  - { name: "Samsara", ats: GREENHOUSE, slug: samsara }
+  - { name: "Toast", ats: GREENHOUSE, slug: toast }
+  - { name: "Rubrik", ats: GREENHOUSE, slug: rubrik }
+  - { name: "Anthropic", ats: GREENHOUSE, slug: anthropic }
+  - { name: "Vercel", ats: GREENHOUSE, slug: vercel }
+  - { name: "Postman", ats: GREENHOUSE, slug: postman }
+  - { name: "PhonePe", ats: GREENHOUSE, slug: phonepe }
+  - { name: "Groww", ats: GREENHOUSE, slug: groww }
+  - { name: "Innovaccer", ats: GREENHOUSE, slug: innovaccer }
+  - { name: "BrowserStack", ats: GREENHOUSE, slug: browserstack }
+  - { name: "Druva", ats: GREENHOUSE, slug: druva }
+  - { name: "Sprinklr", ats: GREENHOUSE, slug: sprinklr }
+  - { name: "Chargebee", ats: GREENHOUSE, slug: chargebee }
+  - { name: "Harness", ats: GREENHOUSE, slug: harnessinc }
+  - { name: "HackerRank", ats: GREENHOUSE, slug: hackerrank }
+  - { name: "MindTickle", ats: GREENHOUSE, slug: mindtickle }
+  - { name: "Whatfix", ats: GREENHOUSE, slug: whatfix }
+  - { name: "Icertis", ats: GREENHOUSE, slug: icertis }
+  - { name: "Uniphore", ats: GREENHOUSE, slug: uniphore }
+  - { name: "Darwinbox", ats: GREENHOUSE, slug: darwinbox }
+  - { name: "Navi", ats: GREENHOUSE, slug: navi }
+  - { name: "smallcase", ats: GREENHOUSE, slug: smallcase }
+  - { name: "ClearTax", ats: GREENHOUSE, slug: cleartax }
+  - { name: "Canonical", ats: GREENHOUSE, slug: canonical }
+  - { name: "Grafana Labs", ats: GREENHOUSE, slug: grafanalabs }
+  - { name: "New Relic", ats: GREENHOUSE, slug: newrelic }
+  - { name: "Sumo Logic", ats: GREENHOUSE, slug: sumologic }
+  - { name: "HashiCorp", ats: GREENHOUSE, slug: hashicorp }
+  - { name: "Intercom", ats: GREENHOUSE, slug: intercom }
+  - { name: "Duolingo", ats: GREENHOUSE, slug: duolingo }
+  - { name: "Squarespace", ats: GREENHOUSE, slug: squarespace }
+  - { name: "Etsy", ats: GREENHOUSE, slug: etsy }
+  - { name: "Roblox", ats: GREENHOUSE, slug: roblox }
+  - { name: "Unity", ats: GREENHOUSE, slug: unity3d }
+  - { name: "Scale AI", ats: GREENHOUSE, slug: scaleai }
+  - { name: "Nuro", ats: GREENHOUSE, slug: nuro }
+  - { name: "AppLovin", ats: GREENHOUSE, slug: applovin }
+  - { name: "Carta", ats: GREENHOUSE, slug: carta }
+  - { name: "Checkr", ats: GREENHOUSE, slug: checkr }
+  - { name: "Flexport", ats: GREENHOUSE, slug: flexport }
+  - { name: "Faire", ats: GREENHOUSE, slug: faire }
+  - { name: "Gong", ats: GREENHOUSE, slug: gong }
+  - { name: "Amplitude", ats: GREENHOUSE, slug: amplitude }
+  - { name: "Mixpanel", ats: GREENHOUSE, slug: mixpanel }
+  - { name: "Fivetran", ats: GREENHOUSE, slug: fivetran }
+  - { name: "dbt Labs", ats: GREENHOUSE, slug: dbtlabsinc }
+  - { name: "Temporal", ats: GREENHOUSE, slug: temporaltechnologies }
+  - { name: "Cockroach Labs", ats: GREENHOUSE, slug: cockroachlabs }
+  - { name: "Yugabyte", ats: GREENHOUSE, slug: yugabyte }
+  - { name: "Couchbase", ats: GREENHOUSE, slug: couchbase }
+  - { name: "Redis", ats: GREENHOUSE, slug: redis }
+  - { name: "Neo4j", ats: GREENHOUSE, slug: neo4j }
+  - { name: "Starburst", ats: GREENHOUSE, slug: starburst }
+  - { name: "Dremio", ats: GREENHOUSE, slug: dremio }
+  - { name: "Sigma Computing", ats: GREENHOUSE, slug: sigmacomputing }
+  - { name: "ThoughtSpot", ats: GREENHOUSE, slug: thoughtspot }
+  - { name: "Tailscale", ats: GREENHOUSE, slug: tailscale }
+  - { name: "Calendly", ats: GREENHOUSE, slug: calendly }
+  - { name: "Grammarly", ats: GREENHOUSE, slug: grammarly }
+  - { name: "Webflow", ats: GREENHOUSE, slug: webflow }
+  - { name: "Miro", ats: GREENHOUSE, slug: miro }
+  - { name: "Canva", ats: GREENHOUSE, slug: canva }
+  - { name: "Atlan", ats: GREENHOUSE, slug: atlan }
+  - { name: "Hasura", ats: GREENHOUSE, slug: hasura }
+  - { name: "Razorpay", ats: GREENHOUSE, slug: razorpaysoftwareprivatelimited }
+  - { name: "Meesho", ats: GREENHOUSE, slug: meesho }
+  - { name: "Zepto", ats: GREENHOUSE, slug: zepto }
+  - { name: "Swiggy", ats: GREENHOUSE, slug: swiggy }
+  - { name: "InMobi", ats: GREENHOUSE, slug: inmobi }
+  - { name: "Glance", ats: GREENHOUSE, slug: glance }
+  - { name: "Freshworks", ats: GREENHOUSE, slug: freshworks }
+  - { name: "MoEngage", ats: GREENHOUSE, slug: moengage }
+  - { name: "CleverTap", ats: GREENHOUSE, slug: clevertap }
+  - { name: "Exotel", ats: GREENHOUSE, slug: exotel }
+  - { name: "Hevo Data", ats: GREENHOUSE, slug: hevodata }
+  - { name: "Simplilearn", ats: GREENHOUSE, slug: simplilearn }
+  - { name: "upGrad", ats: GREENHOUSE, slug: upgrad }
+  - { name: "PhysicsWallah", ats: GREENHOUSE, slug: physicswallah }
+  - { name: "Rupeek", ats: GREENHOUSE, slug: rupeek }
+  - { name: "OkCredit", ats: GREENHOUSE, slug: okcredit }
+  - { name: "Lenskart", ats: GREENHOUSE, slug: lenskart }
+  - { name: "Nykaa", ats: GREENHOUSE, slug: nykaa }
+  - { name: "Zomato", ats: GREENHOUSE, slug: zomato }
+  - { name: "Paytm", ats: GREENHOUSE, slug: paytm }
+  - { name: "PayU", ats: GREENHOUSE, slug: payu }
+  - { name: "Pine Labs", ats: GREENHOUSE, slug: pinelabs }
+  - { name: "CRED", ats: LEVER, slug: cred }
+  - { name: "Zeta", ats: LEVER, slug: zeta }
+  - { name: "Palantir", ats: LEVER, slug: palantir }
+  - { name: "Spotify", ats: LEVER, slug: spotify }
+  - { name: "Kong", ats: LEVER, slug: kong }
+  - { name: "Khatabook", ats: LEVER, slug: khatabook }
+  - { name: "Upstox", ats: LEVER, slug: upstox }
+  - { name: "Dream11", ats: LEVER, slug: dream11 }
+  - { name: "ShareChat", ats: LEVER, slug: sharechat }
+  - { name: "Jar", ats: LEVER, slug: jar }
+  - { name: "Rapido", ats: LEVER, slug: rapido }
+  - { name: "Unacademy", ats: LEVER, slug: unacademy }
+  - { name: "Vedantu", ats: LEVER, slug: vedantu }
+  - { name: "MPL", ats: LEVER, slug: mpl }
+  - { name: "Games24x7", ats: LEVER, slug: games24x7 }
+  - { name: "Juspay", ats: LEVER, slug: juspay }
+  - { name: "Setu", ats: LEVER, slug: setu }
+  - { name: "FamPay", ats: LEVER, slug: fampay }
+  - { name: "Open", ats: LEVER, slug: open }
+  - { name: "LeadSquared", ats: LEVER, slug: leadsquared }
+  - { name: "Practo", ats: LEVER, slug: practo }
+  - { name: "PharmEasy", ats: LEVER, slug: pharmeasy }
+  - { name: "Urban Company", ats: LEVER, slug: urbancompany }
+  - { name: "Shiprocket", ats: LEVER, slug: shiprocket }
+  - { name: "Delhivery", ats: LEVER, slug: delhivery }
+  - { name: "Ather Energy", ats: LEVER, slug: atherenergy }
+  - { name: "Porter", ats: LEVER, slug: porter }
+  - { name: "Licious", ats: LEVER, slug: licious }
+  - { name: "CARS24", ats: LEVER, slug: cars24 }
+  - { name: "Spinny", ats: LEVER, slug: spinny }
+  - { name: "NoBroker", ats: LEVER, slug: nobroker }
+  - { name: "Slice", ats: LEVER, slug: sliceit }
+  - { name: "Jupiter", ats: LEVER, slug: jupiter }
+  - { name: "Fi", ats: LEVER, slug: fi }
+  - { name: "Acko", ats: LEVER, slug: acko }
+  - { name: "Digit Insurance", ats: LEVER, slug: godigit }
+  - { name: "PolicyBazaar", ats: LEVER, slug: policybazaar }
+  - { name: "BharatPe", ats: LEVER, slug: bharatpe }
+  - { name: "Cashfree", ats: LEVER, slug: cashfree }
+  - { name: "Mobikwik", ats: LEVER, slug: mobikwik }
+  - { name: "Ola", ats: LEVER, slug: olacabs }
+  - { name: "Udaan", ats: LEVER, slug: udaan }
+  - { name: "Zetwerk", ats: LEVER, slug: zetwerk }
+  - { name: "Ninjacart", ats: LEVER, slug: ninjacart }
+  - { name: "Classplus", ats: LEVER, slug: classplus }
+  - { name: "Eruditus", ats: LEVER, slug: eruditus }
+  - { name: "Leap", ats: LEVER, slug: leap }
+  - { name: "HealthifyMe", ats: LEVER, slug: healthifyme }
+  - { name: "Cult.fit", ats: LEVER, slug: cultfit }
+  - { name: "Plum", ats: LEVER, slug: plum }
+  - { name: "Atlassian", ats: LEVER, slug: atlassian }
+  - { name: "Wealthsimple", ats: LEVER, slug: wealthsimple }
+  - { name: "Contentsquare", ats: LEVER, slug: contentsquare }
+  - { name: "Highspot", ats: LEVER, slug: highspot }
+  - { name: "Outreach", ats: LEVER, slug: outreach }
+  - { name: "Notion", ats: ASHBY, slug: notion }
+  - { name: "Linear", ats: ASHBY, slug: linear }
+  - { name: "Ramp", ats: ASHBY, slug: ramp }
+  - { name: "OpenAI", ats: ASHBY, slug: openai }
+  - { name: "Deel", ats: ASHBY, slug: deel }
+  - { name: "Supabase", ats: ASHBY, slug: supabase }
+  - { name: "Replit", ats: ASHBY, slug: replit }
+  - { name: "PostHog", ats: ASHBY, slug: posthog }
+  - { name: "Sarvam AI", ats: ASHBY, slug: sarvam }
+  - { name: "Cohere", ats: ASHBY, slug: cohere }
+  - { name: "ElevenLabs", ats: ASHBY, slug: elevenlabs }
+  - { name: "Modal", ats: ASHBY, slug: modal }
+  - { name: "Retool", ats: ASHBY, slug: retool }
+  - { name: "Rippling", ats: ASHBY, slug: rippling }
+  - { name: "Mercury", ats: ASHBY, slug: mercury }
+  - { name: "Vanta", ats: ASHBY, slug: vanta }
+  - { name: "Watershed", ats: ASHBY, slug: watershed }
+  - { name: "Hex", ats: ASHBY, slug: hex }
+  - { name: "Clay", ats: ASHBY, slug: claylabs }
+  - { name: "1Password", ats: ASHBY, slug: 1password }
+  - { name: "Zapier", ats: ASHBY, slug: zapier }
+  - { name: "Docker", ats: ASHBY, slug: docker }
+  - { name: "Raycast", ats: ASHBY, slug: raycast }
+  - { name: "PlanetScale", ats: ASHBY, slug: planetscale }
+  - { name: "Neon", ats: ASHBY, slug: neon }
+  - { name: "Plain", ats: ASHBY, slug: plain }
+  - { name: "Ashby", ats: ASHBY, slug: ashby }
+  - { name: "Perplexity", ats: ASHBY, slug: perplexity }
+  - { name: "Runway", ats: ASHBY, slug: runway }
+  - { name: "Mistral AI", ats: ASHBY, slug: mistral }
+  - { name: "Cursor", ats: ASHBY, slug: cursor }
+  - { name: "Sourcegraph", ats: ASHBY, slug: sourcegraph }
+  - { name: "Pylon", ats: ASHBY, slug: pylon }
+  - { name: "Resend", ats: ASHBY, slug: resend }
+  - { name: "Krea", ats: ASHBY, slug: krea }
+  - { name: "Sierra", ats: ASHBY, slug: sierra }
+  - { name: "Decagon", ats: ASHBY, slug: decagon }
+  - { name: "Harvey", ats: ASHBY, slug: harvey }
+  - { name: "Hebbia", ats: ASHBY, slug: hebbia }
+  - { name: "Writer", ats: ASHBY, slug: writer }
+  - { name: "Ironclad", ats: ASHBY, slug: ironclad }
+  - { name: "Attio", ats: ASHBY, slug: attio }
+  - { name: "Multiwoven", ats: ASHBY, slug: multiwoven }
+  - { name: "Composio", ats: ASHBY, slug: composio }
+  - { name: "Krutrim", ats: ASHBY, slug: krutrim }
+  - { name: "Atlys", ats: ASHBY, slug: atlys }
+  - { name: "Fello", ats: ASHBY, slug: fello }

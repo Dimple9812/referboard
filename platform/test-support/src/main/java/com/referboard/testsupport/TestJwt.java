@@ -46,7 +46,15 @@ public final class TestJwt {
         return token(userId, ISSUER, AUDIENCE, Instant.now().plusSeconds(900));
     }
 
+    public static String tokenWithRoles(UUID userId, String... roles) {
+        return token(userId, ISSUER, AUDIENCE, Instant.now().plusSeconds(900), List.of(roles));
+    }
+
     public static String token(UUID userId, String issuer, String audience, Instant expiresAt) {
+        return token(userId, issuer, audience, expiresAt, List.of("USER"));
+    }
+
+    public static String token(UUID userId, String issuer, String audience, Instant expiresAt, List<String> roles) {
         // Issued 15 minutes before expiry, so an already-expired token is still well-formed.
         Instant issued = expiresAt.minusSeconds(900);
         JwtClaimsSet claims = JwtClaimsSet.builder()
@@ -59,7 +67,7 @@ public final class TestJwt {
                 .expiresAt(expiresAt)
                 .claim("email", userId + "@test.referboard")
                 .claim("name", "Test User")
-                .claim("roles", List.of("USER"))
+                .claim("roles", roles)
                 .build();
         var encoder = new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(KEY)));
         return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(SignatureAlgorithm.RS256).build(), claims))

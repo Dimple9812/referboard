@@ -1,0 +1,127 @@
+{
+ "jobs": [
+  {
+   "id": 4001,
+   "internal_job_id": 4002,
+   "title": "Senior Backend Engineer",
+   "updated_at": "2026-10-01T10:00:00-04:00",
+   "first_published": "2026-09-20T10:00:00-04:00",
+   "requisition_id": "R-4001",
+   "location": {
+    "name": "Bengaluru, India"
+   },
+   "absolute_url": "https://boards.greenhouse.io/acmepay/jobs/4001",
+   "language": "en",
+   "metadata": null,
+   "content": "&lt;p&gt;Build payment rails in &lt;strong&gt;Java&lt;/strong&gt; and Spring Boot.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Kafka at scale&lt;/li&gt;&lt;li&gt;PostgreSQL&lt;/li&gt;&lt;/ul&gt;",
+   "departments": [
+    {
+     "id": 1,
+     "name": "Engineering",
+     "parent_id": null,
+     "child_ids": []
+    }
+   ],
+   "offices": [
+    {
+     "id": 2,
+     "name": "Bengaluru, India",
+     "location": "Bengaluru, India"
+    }
+   ]
+  },
+  {
+   "id": 4002,
+   "internal_job_id": 4003,
+   "title": "Frontend Engineer",
+   "updated_at": "2026-10-01T10:00:00-04:00",
+   "first_published": "2026-09-20T10:00:00-04:00",
+   "requisition_id": "R-4002",
+   "location": {
+    "name": "Remote - India"
+   },
+   "absolute_url": "https://boards.greenhouse.io/acmepay/jobs/4002",
+   "language": "en",
+   "metadata": null,
+   "content": "&lt;p&gt;React + TypeScript. Own our merchant dashboard.&lt;/p&gt;",
+   "departments": [
+    {
+     "id": 1,
+     "name": "Engineering",
+     "parent_id": null,
+     "child_ids": []
+    }
+   ],
+   "offices": [
+    {
+     "id": 2,
+     "name": "Remote - India",
+     "location": "Remote - India"
+    }
+   ]
+  },
+  {
+   "id": 4003,
+   "internal_job_id": 4004,
+   "title": "Backend Engineer",
+   "updated_at": "2026-10-01T10:00:00-04:00",
+   "first_published": "2026-09-20T10:00:00-04:00",
+   "requisition_id": "R-4003",
+   "location": {
+    "name": "New York, NY"
+   },
+   "absolute_url": "https://boards.greenhouse.io/acmepay/jobs/4003",
+   "language": "en",
+   "metadata": null,
+   "content": "&lt;p&gt;On-site in NYC. Go and Kubernetes.&lt;/p&gt;",
+   "departments": [
+    {
+     "id": 1,
+     "name": "Engineering",
+     "parent_id": null,
+     "child_ids": []
+    }
+   ],
+   "offices": [
+    {
+     "id": 2,
+     "name": "New York, NY",
+     "location": "New York, NY"
+    }
+   ]
+  },
+  {
+   "id": 4004,
+   "internal_job_id": 4005,
+   "title": "Enterprise Account Executive",
+   "updated_at": "2026-10-01T10:00:00-04:00",
+   "first_published": "2026-09-20T10:00:00-04:00",
+   "requisition_id": "R-4004",
+   "location": {
+    "name": "Mumbai"
+   },
+   "absolute_url": "https://boards.greenhouse.io/acmepay/jobs/4004",
+   "language": "en",
+   "metadata": null,
+   "content": "&lt;p&gt;Close enterprise deals.&lt;/p&gt;",
+   "departments": [
+    {
+     "id": 1,
+     "name": "Engineering",
+     "parent_id": null,
+     "child_ids": []
+    }
+   ],
+   "offices": [
+    {
+     "id": 2,
+     "name": "Mumbai",
+     "location": "Mumbai"
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "total": 4
+ }
+}

@@ -1,0 +1,8 @@
+companies:
+  - { name: "AcmePay", ats: GREENHOUSE, slug: acmepay }
+  - { name: "BrightData", ats: LEVER, slug: brightdata }
+  - { name: "Nimbus AI", ats: ASHBY, slug: nimbusai }
+  - { name: "DownCo", ats: LEVER, slug: downco }
+  - { name: "GhostCo", ats: GREENHOUSE, slug: ghostco }        # wrong slug → 404 → NOT_FOUND
+  - { name: "Bad Entry", ats: WORKDAY, slug: nope }             # unsupported ATS → skipped
+  - { name: "Paused", ats: ASHBY, slug: paused, enabled: false }
