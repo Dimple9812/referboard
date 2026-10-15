@@ -24,8 +24,18 @@ public record AuthProperties(
             @NotNull Duration refreshTokenTtl,
             String privateKey,
             String publicKey,
-            @NotBlank String keyDir
+            @NotBlank String keyDir,
+            Duration refreshReuseGrace
     ) {
+        /**
+         * How long a just-rotated refresh token may be presented again without being treated as theft. Covers a
+         * response lost in flight (page reload or tab close mid-refresh) and two tabs refreshing at once.
+         */
+        public Jwt {
+            if (refreshReuseGrace == null) {
+                refreshReuseGrace = Duration.ofSeconds(30);
+            }
+        }
     }
 
     /** {@code clientId} empty disables Google sign-in (endpoint answers 503). */

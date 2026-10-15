@@ -48,7 +48,7 @@ class AuthServiceTest {
     private final PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     private final AuthProperties props = new AuthProperties(
-            new AuthProperties.Jwt("iss", "aud", Duration.ofMinutes(15), Duration.ofDays(30), null, null, "x"),
+            new AuthProperties.Jwt("iss", "aud", Duration.ofMinutes(15), Duration.ofDays(30), null, null, "x", null),
             new AuthProperties.Google("client-id", "https://example.invalid/certs"),
             new AuthProperties.RefreshCookie("rb_refresh", "/api/auth", true, "Strict"),
             new AuthProperties.Lockout(3, Duration.ofMinutes(15)));

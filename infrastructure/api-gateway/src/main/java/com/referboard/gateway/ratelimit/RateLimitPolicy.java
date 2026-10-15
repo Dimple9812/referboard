@@ -8,7 +8,9 @@ import java.util.regex.Pattern;
 /**
  * Which bucket a request draws from:
  * <ul>
- *   <li>AUTH — sign-in, sign-up, refresh: per client IP, strict (credential stuffing);</li>
+ *   <li>AUTH — sign-in, sign-up: per client IP, strict (credential stuffing). Refresh is not here: it needs an
+ *       unguessable 256-bit cookie, runs on every page load, and a strict per-IP bucket would sign out
+ *       everyone behind a shared office or campus IP;</li>
  *   <li>EXPENSIVE — calls that run an LLM (JD analysis, message drafts, resume upload/parse): per user;</li>
  *   <li>DEFAULT — every other API call: per user, or per IP when anonymous.</li>
  * </ul>
@@ -17,7 +19,7 @@ public final class RateLimitPolicy {
 
     public enum Bucket { AUTH, EXPENSIVE, DEFAULT }
 
-    private static final Pattern AUTH = Pattern.compile("^/api/auth/(login|signup|google|refresh)$");
+    private static final Pattern AUTH = Pattern.compile("^/api/auth/(login|signup|google)$");
     private static final Pattern EXPENSIVE = Pattern.compile(
             "^/api/analyses(/upload)?$|^/api/referrals/contacts/[^/]+/drafts$|^/api/profile/resumes(/[^/]+/reparse)?$");
 

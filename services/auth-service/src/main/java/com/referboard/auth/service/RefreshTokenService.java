@@ -74,6 +74,13 @@ public class RefreshTokenService {
         RefreshToken current = repository.findByTokenHashForUpdate(hash(rawToken))
                 .orElseThrow(RefreshTokenService::invalid);
 
+        if (current.isRevoked() && lostResponseRetry(current, now) && current.getUser().isActive()
+                && current.getUser().getDeletedAt() == null) {
+            // The client never received (or never stored) the successor: give it a token instead of a sign-out.
+            log.info("Refresh token for user {} presented again within the grace period; issuing a new one",
+                    current.getUser().getId());
+            return new Rotation(current.getUser(), issue(current.getUser(), current.getFamilyId(), client));
+        }
         if (current.isRevoked()) {
             int revoked = repository.revokeFamily(current.getFamilyId(), now);
             log.warn("Refresh token reuse detected for user {} (family {}); revoked {} tokens",
@@ -91,6 +98,20 @@ public class RefreshTokenService {
         Issued next = issue(user, current.getFamilyId(), client);
         current.revoke(now, next.entity().getId());
         return new Rotation(user, next);
+    }
+
+    /**
+     * True when the token was rotated (not logged out) moments ago and nothing has used its successor since, which
+     * is what a reload mid-refresh or two tabs refreshing together look like. A replay after the successor was used,
+     * or after the grace period, is still treated as theft.
+     */
+    private boolean lostResponseRetry(RefreshToken token, Instant now) {
+        if (token.getReplacedBy() == null || token.getRevokedAt() == null
+                || token.getRevokedAt().plus(props.jwt().refreshReuseGrace()).isBefore(now)) {
+            return false;
+        }
+        return repository.findById(token.getReplacedBy()).map(next -> !next.isRevoked()).orElse(false)
+                && !token.isExpired(now);
     }
 
     @Transactional

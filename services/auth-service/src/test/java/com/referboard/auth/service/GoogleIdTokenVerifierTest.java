@@ -37,7 +37,7 @@ class GoogleIdTokenVerifierTest {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(googleKey.toRSAPublicKey()).build();
         decoder.setJwtValidator(GoogleIdTokenVerifier.validators(CLIENT_ID));
         AuthProperties props = new AuthProperties(
-                new AuthProperties.Jwt("iss", "aud", Duration.ofMinutes(15), Duration.ofDays(30), null, null, "x"),
+                new AuthProperties.Jwt("iss", "aud", Duration.ofMinutes(15), Duration.ofDays(30), null, null, "x", null),
                 new AuthProperties.Google(CLIENT_ID, "https://unused.invalid"),
                 new AuthProperties.RefreshCookie("rb_refresh", "/api/auth", true, "Strict"),
                 new AuthProperties.Lockout(5, Duration.ofMinutes(15)));

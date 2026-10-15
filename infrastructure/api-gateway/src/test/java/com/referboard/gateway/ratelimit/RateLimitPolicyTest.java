@@ -14,7 +14,7 @@ class RateLimitPolicyTest {
     @Test
     void classifiesBuckets() {
         assertThat(RateLimitPolicy.classify(HttpMethod.POST, "/api/auth/login")).isEqualTo(AUTH);
-        assertThat(RateLimitPolicy.classify(HttpMethod.POST, "/api/auth/refresh")).isEqualTo(AUTH);
+        assertThat(RateLimitPolicy.classify(HttpMethod.POST, "/api/auth/refresh")).as("page loads must not drain the sign-in bucket").isEqualTo(DEFAULT);
         assertThat(RateLimitPolicy.classify(HttpMethod.POST, "/api/auth/logout")).isEqualTo(DEFAULT);
         assertThat(RateLimitPolicy.classify(HttpMethod.GET, "/api/auth/me")).isEqualTo(DEFAULT);
         assertThat(RateLimitPolicy.classify(HttpMethod.POST, "/api/analyses")).isEqualTo(EXPENSIVE);

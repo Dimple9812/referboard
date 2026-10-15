@@ -45,7 +45,7 @@ referboard:
     trust-forwarded-for: ${TRUST_FORWARDED_FOR:false}
     rate-limits:
       default-per-minute: ${RATE_LIMIT_REQUESTS_PER_MINUTE:120}    # per user (or per IP when anonymous)
-      auth-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:10}            # login/signup/refresh, per IP
+      auth-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:10}            # login/signup/google, per IP
       expensive-per-minute: ${EXPENSIVE_RATE_LIMIT_PER_MINUTE:10}  # LLM-backed calls, per user
     # Service locations: lb:// = Eureka. Override with a URL to bypass discovery (local runs, tests).
     services:

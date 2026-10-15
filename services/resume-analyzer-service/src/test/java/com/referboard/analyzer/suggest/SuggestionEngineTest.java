@@ -69,6 +69,28 @@ class SuggestionEngineTest {
     }
 
     @Test
+    void keepsTheUsersSummaryWhenARewriteWouldNameNoSkillsTheRoleWants() {
+        when(llm.available()).thenReturn(false);
+        ParsedJd design = new HeuristicJdParser(TAXONOMY).parse(JdText.normalize("""
+                Product Designer
+
+                Requirements
+                - Hands-on experience with Figma
+                - Hands-on experience with A/B testing
+                """), null, "Banyan");
+        ResumeContent withSummary = resume.withSummary("Backend engineer building payment platforms on Java.");
+        MatchReport weak = new MatchScorer(TAXONOMY, new HashingEmbeddingClient(1536, TAXONOMY), Clock.systemUTC())
+                .score(withSummary, withSummary.toPlainText(), 1, design);
+        assertThat(weak.matchedSkills()).isEmpty();
+        var out = engine.suggest(withSummary, design, weak, new BigDecimal("7.5"));
+        assertThat(out.suggestions()).noneMatch(x -> x.type() == Type.SUMMARY_REWRITE);
+
+        // With no summary at all, adding one is still useful.
+        var blank = engine.suggest(resume, design, weak, new BigDecimal("7.5"));
+        assertThat(blank.suggestions()).anyMatch(x -> x.type() == Type.SUMMARY_REWRITE && x.title().equals("Add a short summary"));
+    }
+
+    @Test
     void aiRewritesAreGuarded() {
         when(llm.available()).thenReturn(true);
         when(llm.structured(any())).thenReturn(new SuggestionEngine.AiOutput(List.of(

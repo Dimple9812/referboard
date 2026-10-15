@@ -44,6 +44,6 @@ class JwtKeyConfigTest {
 
     private static AuthProperties.Jwt jwt(String priv, String pub, Path dir) {
         return new AuthProperties.Jwt("iss", "aud", Duration.ofMinutes(15), Duration.ofDays(30), priv, pub,
-                dir.toString());
+                dir.toString(), null);
     }
 }

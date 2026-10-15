@@ -1,0 +1,36 @@
+@import '@fontsource-variable/bricolage-grotesque/index.css';
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    @apply bg-paper font-sans text-ink antialiased;
+    font-feature-settings: 'kern';
+  }
+  h1, h2, h3 { @apply font-display text-ink; font-optical-sizing: auto; letter-spacing: -0.01em; }
+  :focus-visible { @apply outline-none ring-2 ring-marigold ring-offset-2 ring-offset-paper; }
+  ::selection { background: #FDF3D6; }
+}
+
+@layer utilities {
+  .tabular { font-variant-numeric: tabular-nums; }
+  /* Rich job descriptions (sanitised HTML from ATS boards). */
+  .prose-jd { @apply text-[0.95rem] leading-relaxed text-ink-soft; max-width: 68ch; }
+  .prose-jd h1, .prose-jd h2, .prose-jd h3, .prose-jd h4, .prose-jd strong { @apply font-sans font-semibold text-ink; }
+  .prose-jd h1, .prose-jd h2, .prose-jd h3, .prose-jd h4 { @apply mb-2 mt-6 text-base; }
+  .prose-jd p { @apply my-3; }
+  .prose-jd ul { @apply my-3 list-disc pl-5; }
+  .prose-jd ol { @apply my-3 list-decimal pl-5; }
+  .prose-jd li { @apply my-1; }
+  .prose-jd a { @apply text-ink underline decoration-marigold underline-offset-2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

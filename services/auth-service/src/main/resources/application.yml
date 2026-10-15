@@ -50,6 +50,8 @@ referboard:
       audience: ${JWT_AUDIENCE:referboard}
       access-token-ttl: ${JWT_ACCESS_TTL:PT15M}
       refresh-token-ttl: ${JWT_REFRESH_TTL:P30D}
+      # A rotated token presented again within this window gets a new token instead of revoking the session.
+      refresh-reuse-grace: ${JWT_REFRESH_REUSE_GRACE:PT30S}
       # PEM (PKCS#8 private, X.509 public), raw or base64-encoded. If unset, a key pair is generated
       # once and persisted under key-dir so tokens survive restarts in local dev.
       private-key: ${JWT_PRIVATE_KEY:}

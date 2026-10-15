@@ -497,10 +497,15 @@ requires a new `.v2` topic, with the producer dual-writing until consumers migra
 
 - Access token: RS256 JWT, 15 min. Claims: `iss`, `aud=["referboard"]`, `sub`=user UUID, `email`, `name`,
   `roles`, `jti`, `iat`, `nbf`, `exp`.
-- Refresh token: 30 days, cookie `rb_refresh` (`HttpOnly; SameSite=Strict; Path=/api/auth; Secure`).
+- Refresh token: 30 days, cookie `rb_refresh` (`HttpOnly; SameSite=Strict; Path=/api/auth; Secure`), rotated
+  on every use. Presenting a rotated token again is treated as theft and revokes the whole family, except
+  within `JWT_REFRESH_REUSE_GRACE` (30 s) when its successor has never been used. That case is a response
+  lost in flight (reload mid-refresh, two tabs at once), and it gets a fresh token instead of a sign-out.
+- Web app: access token in memory only; one in-flight refresh shared by every caller; strict CSP from nginx.
 - Password: bcrypt via `DelegatingPasswordEncoder` (`{bcrypt}` prefix allows upgrading the algorithm later;
   hashes are upgraded on login). 8–72 chars, letter + digit.
-- Brute force: 5 failures → 15 min lockout per account (auth-service) + per-IP rate limit (gateway).
+- Brute force: 5 failures → 15 min lockout per account (auth-service) + per-IP rate limit on sign-in and sign-up
+  (gateway). Refresh is in the normal bucket: it needs a 256-bit token and runs on every page load.
 - Unknown-email logins spend the same bcrypt time as real ones (no timing oracle).
 - Every service re-validates the JWT and scopes data by `sub`; IDs in paths are always checked against the
   owner.

@@ -152,10 +152,12 @@ public class SuggestionEngine {
                     null, null, Target.none(), List.of(), false, null, false, null, Origin.RULES));
         }
 
-        // Summary from facts only.
+        // Summary from facts only. Replacing the user's own summary is worth it only when the new one names skills
+        // this role wants; otherwise it would just drop their wording.
         String summary = ruleSummary(resume, report, years);
-        if (summary != null && (resume.summary() == null || resume.summary().isBlank()
-                || !mentionsTitle(resume.summary(), jd.title()))) {
+        boolean hasSummary = resume.summary() != null && !resume.summary().isBlank();
+        if (summary != null && (!hasSummary
+                || (!mentionsTitle(resume.summary(), jd.title()) && !report.matchedSkills().isEmpty()))) {
             out.add(new Suggestion("rule-" + (++n), Type.SUMMARY_REWRITE, Priority.MEDIUM,
                     resume.summary() == null || resume.summary().isBlank() ? "Add a short summary"
                             : "Point your summary at this role",

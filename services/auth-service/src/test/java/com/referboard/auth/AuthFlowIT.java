@@ -105,8 +105,18 @@ class AuthFlowIT {
         String cookie2 = refreshCookie(refreshed);
         assertThat(cookie2).isNotEqualTo(cookie1);
 
-        // replaying the old token is treated as theft: rejected, and the whole family is revoked
+        // presenting the old token again moments later (a reload mid-refresh lost the response) still works
+        ResponseEntity<String> retried = post("/api/auth/refresh", null, cookie1);
+        assertThat(retried.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String cookie2b = refreshCookie(retried);
+        assertThat(cookie2b).isNotEqualTo(cookie2);
+
+        // once a successor has been used, replaying the old token is theft: rejected, whole family revoked
+        String cookie4 = refreshCookie(post("/api/auth/refresh", null, cookie2b));
+        assertThat(post("/api/auth/refresh", null, cookie2b).getStatusCode()).isEqualTo(HttpStatus.OK); // within grace
+        jdbc.update("update refresh_tokens set revoked_at = now() - interval '5 minutes' where revoked_at is not null");
         assertThat(post("/api/auth/refresh", null, cookie1).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(post("/api/auth/refresh", null, cookie4).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(post("/api/auth/refresh", null, cookie2).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
         // a fresh login works and logout revokes it

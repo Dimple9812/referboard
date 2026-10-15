@@ -27,28 +27,29 @@ flowchart LR
 | skills | ✅ | 7 — aliases (K8s→Kubernetes), ambiguous words ("Go", "Excel"), extraction offsets |
 | ai-client | ✅ | 9 — Claude/OpenAI request shape, retries on 429/5xx/529, no retry on 4xx, embeddings |
 | discovery-server | ✅ | boots, health UP |
-| auth-service | ✅ | 15 unit + 7 integration (real Postgres, embedded Kafka) |
+| auth-service | ✅ | 16 unit + 8 integration (real Postgres, embedded Kafka) |
 | profile-service | ✅ | 21 unit + 5 integration (real PDF/DOCX → parse → pgvector → Kafka; concurrent-onboarding race) |
 | ingestion-service | ✅ | 54 unit + 2 integration (4 simulated runs over 61 days against mock ATS APIs; force-republish) |
 | job-service | ✅ | 5 unit + 4 integration (events → FTS/trigram/pgvector search, Redis cache, matches, DLT, digest) |
 | referral-service | ✅ | 34 unit + 5 integration (Feign → mock job/profile/Claude APIs, draft guard, pipeline events, reminders on a movable clock) |
-| resume-analyzer-service | ✅ | 28 unit + 7 integration (LLM + heuristic paths, truth guard, tailored DOCX/PDF, free-tier limit, JD cache) |
+| resume-analyzer-service | ✅ | 29 unit + 7 integration (LLM + heuristic paths, truth guard, tailored DOCX/PDF, free-tier limit, JD cache) |
 | tracker-service | ✅ | 7 unit + 6 integration (board API, drag-and-drop ordering, referral/resume/closed-job events, create race) |
 | notification-service | ✅ | 5 unit + 6 integration (real SMTP via GreenMail: escaping, outage + retry, one-click unsubscribe, daily cap, dedup) |
 | api-gateway | ✅ | 5 unit + 9 integration (edge JWT via JWKS, CORS, Redis token buckets, fail-open, JSON errors, docs aggregation) |
-| frontend | ⏳ next | |
+| frontend | ✅ | 13 unit (token refresh, board moves, formatting) + Playwright smoke on desktop and mobile against the live stack |
 
 ## Run locally with Docker
 
 ```bash
 cp .env.example .env          # defaults work for local; add GOOGLE_CLIENT_ID to enable Google sign-in
-docker compose up --build     # postgres+pgvector, redis, kafka, eureka, and every built service
+docker compose up --build     # postgres+pgvector, redis, kafka, eureka, every service, and the web app
 docker compose --profile tools up kafka-ui   # optional Kafka UI on :8090
 ```
 
 | URL | What |
 |---|---|
-| http://localhost:8080 | **API gateway: the only address the frontend uses** |
+| http://localhost:3000 | **The web app** (nginx serving the React build; `/api` is proxied to the gateway) |
+| http://localhost:8080 | API gateway: the only backend address the frontend uses (published on localhost only) |
 | http://localhost:8080/swagger-ui.html | all services' API docs in one Swagger UI (requests go through the gateway) |
 | http://localhost:8761 | Eureka dashboard |
 | http://localhost:8081/swagger-ui.html | auth-service API docs |
@@ -107,6 +108,18 @@ mvn verify -Dit.db=local      # integration tests against a local Postgres inste
 
 Kafka in integration tests is Spring Kafka's embedded KRaft broker (no Docker needed).
 
+Frontend (in `frontend/`):
+
+```bash
+npm ci
+npm test                      # Vitest unit tests
+npm run typecheck && npm run build
+npm run dev                   # Vite on :5173, proxying /api to GATEWAY_URL (default http://localhost:8080)
+# End-to-end smoke test (sign up, onboard, jobs, analyzer, referrals, tracker, inbox, settings, reload, sign out)
+# against a running stack, on a desktop and a phone viewport. E2E_SCREENSHOTS=1 saves each screen to e2e-screens/.
+E2E_BASE_URL=http://localhost:3000 npx playwright test
+```
+
 ## Run a service from your IDE
 
 Start infrastructure only: `docker compose up postgres kafka redis discovery-server`, then run the service's
@@ -128,6 +141,36 @@ comments. The ones that matter today:
 | `KAFKA_BOOTSTRAP_SERVERS` | each service | |
 | `EUREKA_URL` | each service | |
 | `LOG_FORMAT` | each service | `ecs` for structured JSON logs; empty for plain text |
+
+## How the web app works
+
+React 18 + TypeScript on Vite, React Router, TanStack Query, Tailwind with a small set of Radix-based
+components (dialog/sheet, tabs), dnd-kit for the tracker board, sonner for toasts.
+
+- **Session:** the access token lives only in memory (never in localStorage); the refresh token is the
+  httpOnly `rb_refresh` cookie scoped to `/api/auth`. On load the app calls `/api/auth/refresh` to restore the
+  session. An Axios interceptor retries a request once after a 401 with a refreshed token. All refreshes share
+  one in-flight call: refresh tokens rotate, and two concurrent refreshes with the same cookie would look like
+  token theft. If a refresh fails mid-session, the app signs out with a toast.
+- **Pages:** Landing, Sign in / Create account (email or Google), Onboarding (upload → check what we read →
+  preferences), Jobs (recommended and search, with filters in the URL), Job detail (fit panel, Check my
+  resume, Find people to ask), JD Analyzer (job, pasted text or file; report with score breakdown, edits you
+  approve one by one, ATS checks, tailored DOCX/PDF), Referral assistant (who to reach, LinkedIn search links,
+  your contacts and drafts), Referrals CRM (status pipeline, due follow-ups), Tracker (drag-and-drop board),
+  Inbox, Settings (resumes, tailored resumes, job preferences, email, analyzer usage, sign out).
+- **Edits you approve:** only mechanical edits (skill order, the posting's spelling of a skill you have)
+  start ticked. Anything that replaces your own sentences starts unticked. Anything that adds something new
+  needs a separate "Add only if you have this experience" confirmation before the button enables.
+- **Drafts are yours to send:** connection notes show a 300-character counter; the app copies text to the
+  clipboard and links to LinkedIn search. It never opens a LinkedIn profile or sends anything itself.
+- **Look:** ink (#1B2440) on a cool paper background, Bricolage Grotesque for headings and IBM Plex Sans for
+  text. Marigold is kept for referral moments (the thread from you to the company) and green only for match
+  data. Respects reduced motion; visible keyboard focus; skip link; phone layout with a bottom tab bar.
+- **Serving:** `frontend/Dockerfile` builds the app and serves it with nginx (`frontend/docker/nginx.conf`):
+  SPA fallback, year-long caching for hashed assets, `no-cache` for the shell, a strict CSP (self plus
+  Google's sign-in script), and `/api` proxied to the gateway on the same origin, so no CORS is involved.
+  nginx overwrites `X-Forwarded-For` with the client address; the gateway trusts it
+  (`TRUST_FORWARDED_FOR=true`) and is published on localhost only, so the header can't be spoofed from outside.
 
 ## How the referral assistant works
 
@@ -166,10 +209,12 @@ Everything the frontend calls goes to `http://localhost:8080/api/...`. The gatew
   never reach a service, and services validate again. Sign-up, login, refresh, logout, the JWKS and the email
   unsubscribe link are public.
 - **Rate limits with Redis token buckets:** 120 requests/min per user (per IP when signed out), 10/min per IP for
-  sign-in, sign-up and refresh, 10/min per user for LLM-backed calls (JD analysis, message drafts, resume upload).
+  sign-in and sign-up (refresh is in the normal bucket: it runs on every page load and needs an unguessable
+  token), 10/min per user for LLM-backed calls (JD analysis, message drafts, resume upload).
   Over the limit → 429 with `Retry-After`. If Redis is down, requests are allowed (fail open) and a warning is
   logged once a minute.
-- **CORS** for `CORS_ALLOWED_ORIGINS` only, with credentials (the refresh cookie).
+- **CORS** for `CORS_ALLOWED_ORIGINS` only, with credentials (the refresh cookie). The nginx-served app is
+  same-origin and needs no entry; add `http://localhost:5173` for `npm run dev`.
 - **Correlation ids:** keeps a sane `X-Correlation-Id` from the client or creates one, passes it to the service
   (which logs it), returns it once on the response, and writes one access-log line per request.
 - **Errors in one JSON shape:** unknown path → 404, missing/invalid token → 401, service down or unresolvable →
