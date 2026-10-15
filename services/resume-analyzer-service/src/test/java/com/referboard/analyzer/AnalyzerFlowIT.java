@@ -87,6 +87,7 @@ class AnalyzerFlowIT {
     static final UUID JOB = UUID.randomUUID();
     static final AtomicBoolean llmDown = new AtomicBoolean(false);
     static final AtomicInteger jdParseCalls = new AtomicInteger();
+    static final java.util.concurrent.atomic.AtomicReference<String> letterReply = new java.util.concurrent.atomic.AtomicReference<>();
     static final ObjectMapper MAPPER = new ObjectMapper();
 
     static MockWebServer upstream;
@@ -138,6 +139,12 @@ class AnalyzerFlowIT {
                             return new MockResponse().setResponseCode(500).setBody("{\"error\":\"down\"}");
                         }
                         String body = r.getBody().readUtf8();
+                        if (body.contains("You write cover letters")) {
+                            return json(MAPPER.writeValueAsString(Map.of("id", "msg", "type", "message", "role",
+                                    "assistant", "model", "claude-test", "stop_reason", "end_turn", "content",
+                                    List.of(Map.of("type", "text", "text", letterReply.get())),
+                                    "usage", Map.of("input_tokens", 1, "output_tokens", 1))));
+                        }
                         if (body.contains("record_job_requirements")) {
                             jdParseCalls.incrementAndGet();
                             return json(toolUse("record_job_requirements", jdParse()));
@@ -342,6 +349,72 @@ class AnalyzerFlowIT {
 
     @Test
     @Order(7)
+    void writesCoverLettersOnlyFromTheResume() throws Exception {
+        String path = "/api/analyses/" + ids.get("analysis") + "/cover-letters";
+        // A faithful AI letter is kept.
+        letterReply.set("Here is the letter:\n\nDear Hiring Team at Northwind Payments,\n\nI'm applying for the "
+                + "Senior Backend Engineer role. At Lumen Pay I built Spring Boot services in Java for UPI settlements "
+                + "processing 2M transactions a day, and cut p99 latency of the payouts API by 40% with Redis caching."
+                + "\n\nI'd like to talk about how I could help.\n\nRegards,\nAsha Rao");
+        JsonNode ai = json(post(path, Map.of("length", "STANDARD", "motivation", "I pay with Northwind every day"),
+                TOKEN), 201);
+        assertThat(ai.get("origin").asText()).isEqualTo("AI");
+        assertThat(ai.get("body").asText()).startsWith("Dear Hiring Team at Northwind Payments,").endsWith("Asha Rao");
+        assertThat(ai.get("motivation").asText()).isEqualTo("I pay with Northwind every day");
+        assertThat(ai.get("edited").asBoolean()).isFalse();
+        ids.put("letter", ai.get("id").asText());
+
+        // An AI letter that invents a number and a skill is replaced by the template letter.
+        letterReply.set("Dear Hiring Team at Northwind Payments,\n\nI led a team of 12 engineers on AWS.\n\n"
+                + "Regards,\nAsha Rao");
+        JsonNode fallback = json(post(path, Map.of("length", "SHORT"), TOKEN), 201);
+        assertThat(fallback.get("origin").asText()).isEqualTo("TEMPLATE");
+        assertThat(fallback.get("notices").toString()).contains("said something your resume doesn't");
+        assertThat(fallback.get("body").asText()).doesNotContain("12").doesNotContain("AWS")
+                .contains("I'm applying for the").endsWith("Regards,\nAsha Rao");
+
+        // No model: template, with a notice.
+        llmDown.set(true);
+        JsonNode down = json(post(path, null, TOKEN), 201);
+        llmDown.set(false);
+        assertThat(down.get("origin").asText()).isEqualTo("TEMPLATE");
+        assertThat(down.get("notices").toString()).contains("unavailable right now");
+
+        // Edits are the user's; a stale version is refused.
+        String id = ids.get("letter");
+        HttpHeaders h = headers(TOKEN);
+        h.setContentType(MediaType.APPLICATION_JSON);
+        String edited = ai.get("body").asText().replace("I'd like to talk", "I'd love to talk");
+        JsonNode saved = json(rest.exchange("/api/cover-letters/" + id, HttpMethod.PUT,
+                new HttpEntity<>(Map.of("body", edited, "version", ai.get("version").asLong()), h), String.class), 200);
+        assertThat(saved.get("edited").asBoolean()).isTrue();
+        assertThat(saved.get("generatedBody").asText()).contains("I'd like to talk");
+        ResponseEntity<String> stale = rest.exchange("/api/cover-letters/" + id, HttpMethod.PUT,
+                new HttpEntity<>(Map.of("body", "x", "version", ai.get("version").asLong()), h), String.class);
+        assertThat(stale.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(stale.getBody()).contains("CONCURRENT_UPDATE");
+
+        ResponseEntity<byte[]> pdf = rest.exchange("/api/cover-letters/" + id + "/file?format=PDF", HttpMethod.GET,
+                new HttpEntity<>(headers(TOKEN)), byte[].class);
+        assertThat(pdf.getHeaders().getContentDisposition().getFilename())
+                .isEqualTo("Asha_Rao_Northwind_Payments_Cover_Letter.pdf");
+        assertThat(text(pdf.getBody())).contains("Asha Rao", "asha.rao@example.com", "I'd love to talk");
+        ResponseEntity<byte[]> docx = rest.exchange("/api/cover-letters/" + id + "/file", HttpMethod.GET,
+                new HttpEntity<>(headers(TOKEN)), byte[].class);
+        assertThat(docx.getHeaders().getContentDisposition().getFilename()).endsWith(".docx");
+        assertThat(text(docx.getBody())).contains("Dear Hiring Team at Northwind Payments,");
+
+        assertThat(json(get("/api/cover-letters", TOKEN), 200)).hasSize(3);
+        String other = TestJwt.tokenFor(UUID.randomUUID());
+        assertThat(get("/api/cover-letters/" + id, other).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(post(path, null, other).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(rest.exchange("/api/cover-letters/" + id, HttpMethod.DELETE, new HttpEntity<>(headers(TOKEN)),
+                String.class).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(json(get("/api/cover-letters", TOKEN), 200)).hasSize(2);
+    }
+
+    @Test
+    @Order(8)
     void isolationAndAuth() {
         String other = TestJwt.tokenFor(UUID.randomUUID());
         assertThat(get("/api/analyses/" + ids.get("analysis"), other).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);

@@ -62,6 +62,18 @@ test('a new user can get from sign-up to a tracked application', async ({ page }
   await expect(page.getByText('Resume match score')).toBeVisible({ timeout: 60_000 });
   await shot(page, '09-analyzer-report');
 
+  // Cover letter from the analysis: written from the resume, edited, saved.
+  await page.getByLabel('Why this company (optional)').fill('I have used their product for years');
+  await page.getByRole('button', { name: 'Write cover letter' }).click();
+  await expect(page).toHaveURL(/\/cover-letters\/[0-9a-f-]+$/, { timeout: 60_000 });
+  const letter = page.getByLabel('Letter text');
+  await expect(letter).toHaveValue(/^Dear Hiring Team at /);
+  await expect(letter).toHaveValue(/I have used their product for years\./);
+  await letter.fill((await letter.inputValue()).replace('Thank you for your time.', 'Thank you for reading.'));
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByRole('button', { name: 'Saved' })).toBeDisabled();
+  await shot(page, '09b-cover-letter');
+
   await page.goto(jobUrl);
   await page.getByRole('link', { name: /Find people to ask/ }).click();
   await expect(page).toHaveURL(/\/referrals\/jobs\//);

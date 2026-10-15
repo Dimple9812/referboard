@@ -4,10 +4,11 @@ import { AlertTriangle, CheckCircle2, Download, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { errorCode, errorMessage } from '@/api/client';
 import {
-  downloadVersion, useAnalyses, useAnalysis, useAnalyze, useGenerateResume, useJob, useResumes, useUsage, useVersions,
+  downloadVersion, useAnalyses, useAnalysis, useAnalyze, useCoverLetters, useGenerateResume, useJob, useResumes, useUsage,
+  useVersions, useWriteLetter,
   type ResumeChoice,
 } from '@/api/queries';
-import type { AnalysisReport, AtsCheck, ResumeSuggestion, ResumeVersion } from '@/api/types';
+import type { AnalysisReport, AtsCheck, LetterLength, ResumeSuggestion, ResumeVersion } from '@/api/types';
 import { PageHeader } from '@/components/PageHeader';
 import { ScoreBar } from '@/components/Bar';
 import { FileDrop } from '@/components/ResumeDrop';
@@ -304,7 +305,6 @@ type Decision = { accepted: boolean; confirmed: boolean };
 function Suggestions({ r }: { r: AnalysisReport }) {
   const edits = r.suggestions.filter((s) => s.applicable);
   const advice = r.suggestions.filter((s) => !s.applicable);
-  // Safe edits start accepted; anything that adds a claim starts unaccepted and needs a confirmation.
   // Mechanical edits (skill order, the posting's skill names) start ticked; anything that replaces your own sentences doesn't.
   const initial = useMemo(() => Object.fromEntries(edits.map((s) => [s.id, {
     accepted: !s.requiresConfirmation && (s.type === 'SKILLS_REORDER' || s.type === 'SKILL_WORDING' || !s.before), confirmed: false,
@@ -344,6 +344,7 @@ function Suggestions({ r }: { r: AnalysisReport }) {
       </section>
 
       <Generate r={r} decisions={decisions} />
+      <WriteLetter r={r} />
     </>
   );
 }
@@ -411,6 +412,65 @@ function Generate({ r, decisions }: { r: AnalysisReport; decisions: Record<strin
           {unconfirmed.length > 0 && <p className="mt-3 text-sm text-danger">Confirm or untick: {unconfirmed.map((s) => s.title).join('; ')}.</p>}
           <Button className="mt-5" onClick={submit} loading={generate.isPending} disabled={unconfirmed.length > 0}>Create tailored resume</Button>
         </>
+      )}
+    </section>
+  );
+}
+
+const LENGTHS: { value: LetterLength; label: string; hint: string }[] = [
+  { value: 'STANDARD', label: 'One page', hint: 'To attach to an application' },
+  { value: 'SHORT', label: 'Short note', hint: 'For an email or a referral form' },
+];
+
+function WriteLetter({ r }: { r: AnalysisReport }) {
+  const navigate = useNavigate();
+  const write = useWriteLetter(r.id);
+  const existing = useCoverLetters().data?.filter((l) => l.analysisId === r.id) ?? [];
+  const [length, setLength] = useState<LetterLength>('STANDARD');
+  const [motivation, setMotivation] = useState('');
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    write.mutate({ length, motivation: motivation.trim() || undefined }, {
+      onSuccess: (l) => navigate(`/cover-letters/${l.id}`),
+    });
+  };
+  return (
+    <section aria-labelledby="letter" className="rounded-lg border border-line bg-surface p-6">
+      <h2 id="letter" className="text-lg font-semibold">Write a cover letter</h2>
+      <p className="mt-1 text-sm text-slate">Built from your resume and this posting. It only says what your resume says, and you can edit it before you send it.</p>
+      <form onSubmit={submit} className="mt-5 space-y-5">
+        <fieldset>
+          <legend className="text-sm font-medium">Length</legend>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {LENGTHS.map((o) => (
+              <label key={o.value} className={cn('flex cursor-pointer items-start gap-3 rounded border px-3 py-2.5 text-sm',
+                length === o.value ? 'border-ink bg-ink/[0.03]' : 'border-line-strong hover:border-ink')}>
+                <input type="radio" name="length" value={o.value} checked={length === o.value} onChange={() => setLength(o.value)}
+                  className="mt-0.5 accent-ink" />
+                <span><span className="block font-medium">{o.label}</span><span className="text-slate">{o.hint}</span></span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <Field label="Why this company (optional)" hint="In your own words. It's used as written; we never make one up.">
+          {(p) => <Textarea {...p} rows={3} maxLength={600} value={motivation} onChange={(e) => setMotivation(e.target.value)}
+            placeholder={r.job.companyName ? `What draws you to ${r.job.companyName}?` : 'What draws you to this company?'} />}
+        </Field>
+        <Button type="submit" loading={write.isPending}>{write.isPending ? 'Writing' : 'Write cover letter'}</Button>
+      </form>
+      {existing.length > 0 && (
+        <div className="mt-6 border-t border-line pt-4">
+          <h3 className="text-sm font-medium">Letters for this job</h3>
+          <ul className="mt-2 space-y-1 text-sm">
+            {existing.map((l) => (
+              <li key={l.id}>
+                <Link className="underline decoration-line-strong underline-offset-4 hover:text-ink" to={`/cover-letters/${l.id}`}>
+                  {l.length === 'SHORT' ? 'Short note' : 'One-page letter'}, {timeAgo(l.createdAt)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </section>
   );

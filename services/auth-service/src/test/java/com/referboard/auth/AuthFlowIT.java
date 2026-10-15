@@ -30,6 +30,8 @@ import org.springframework.test.context.DynamicPropertySource;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -233,6 +235,78 @@ class AuthFlowIT {
             }
         }
         throw new AssertionError("UserRegistered event for " + email + " not published");
+    }
+
+    @Test
+    void extensionSessionsAreSeparateRevocableAndRotate() throws Exception {
+        String email = "ext-" + UUID.randomUUID() + "@example.com";
+        ResponseEntity<String> signup = post("/api/auth/signup",
+                Map.of("email", email, "password", "Passw0rdOK", "fullName", "Asha Rao"), null);
+        String access = mapper.readTree(signup.getBody()).get("accessToken").asText();
+        String webCookie = refreshCookie(signup);
+
+        // Connecting needs a signed-in user.
+        assertThat(post("/api/auth/extension/connect", null, null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        ResponseEntity<String> connected = bearerPost("/api/auth/extension/connect", access);
+        assertThat(connected.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(connected.getHeaders().getCacheControl()).contains("no-store");
+        assertThat(connected.getHeaders().getFirst(HttpHeaders.SET_COOKIE)).as("no cookie for the extension").isNull();
+        JsonNode tokens = mapper.readTree(connected.getBody());
+        String ext1 = tokens.get("refreshToken").asText();
+        assertThat(tokens.get("accessToken").asText()).isNotBlank();
+        assertThat(tokens.at("/user/email").asText()).isEqualTo(email);
+
+        // The extension rotates in the body; the web endpoint and cookie won't take its token, and vice versa.
+        JsonNode rotated = mapper.readTree(post("/api/auth/extension/refresh", Map.of("refreshToken", ext1), null).getBody());
+        String ext2 = rotated.get("refreshToken").asText();
+        assertThat(ext2).isNotEqualTo(ext1);
+        assertThat(post("/api/auth/refresh", Map.of("refreshToken", ext2), null).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(post("/api/auth/refresh", null, "rb_refresh=" + ext2).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        String webRaw = webCookie.substring(webCookie.indexOf('=') + 1);
+        assertThat(post("/api/auth/extension/refresh", Map.of("refreshToken", webRaw), null).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+        // Those refusals didn't revoke anything.
+        assertThat(post("/api/auth/refresh", null, webCookie).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // Listed in Settings, with the browser; revoking there signs the extension out.
+        JsonNode list = mapper.readTree(get("/api/auth/extension/connections", access).getBody());
+        assertThat(list).hasSize(1);
+        String id = list.get(0).get("id").asText();
+        HttpHeaders h = new HttpHeaders();
+        h.setBearerAuth(access);
+        assertThat(rest.exchange("/api/auth/extension/connections/" + id, HttpMethod.DELETE, new HttpEntity<>(h),
+                String.class).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(post("/api/auth/extension/refresh", Map.of("refreshToken", ext2), null).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(mapper.readTree(get("/api/auth/extension/connections", access).getBody())).isEmpty();
+        // Someone else's connection id is just not found.
+        assertThat(rest.exchange("/api/auth/extension/connections/" + id, HttpMethod.DELETE, new HttpEntity<>(h),
+                String.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+        // Disconnecting from the extension itself.
+        String ext3 = mapper.readTree(bearerPost("/api/auth/extension/connect", access).getBody()).get("refreshToken").asText();
+        assertThat(post("/api/auth/extension/disconnect", Map.of("refreshToken", ext3), null).getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(post("/api/auth/extension/refresh", Map.of("refreshToken", ext3), null).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        // At most five live connections: the oldest goes.
+        List<String> many = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            many.add(mapper.readTree(bearerPost("/api/auth/extension/connect", access).getBody()).get("refreshToken").asText());
+        }
+        assertThat(mapper.readTree(get("/api/auth/extension/connections", access).getBody())).hasSize(5);
+        assertThat(post("/api/auth/extension/refresh", Map.of("refreshToken", many.getFirst()), null).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(post("/api/auth/extension/refresh", Map.of("refreshToken", many.getLast()), null).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+    }
+
+    private ResponseEntity<String> bearerPost(String path, String bearer) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(bearer);
+        return rest.exchange(path, HttpMethod.POST, new HttpEntity<>(null, headers), String.class);
     }
 
     private ResponseEntity<String> post(String path, Object body, String cookie) {

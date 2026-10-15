@@ -36,7 +36,7 @@ public class GatewayRoutes {
                 .route("jobs", api(p -> p.path("/api/jobs/**"), props.service("jobs"), DEFAULT_TIMEOUT))
                 .route("ingestion", api(p -> p.path("/api/ingestion/**"), props.service("ingestion"), DEFAULT_TIMEOUT))
                 .route("referral", api(p -> p.path("/api/referrals/**"), props.service("referral"), LLM_TIMEOUT))
-                .route("analyzer", api(p -> p.path("/api/analyses/**", "/api/resume-versions/**"),
+                .route("analyzer", api(p -> p.path("/api/analyses/**", "/api/resume-versions/**", "/api/cover-letters/**"),
                         props.service("analyzer"), LLM_TIMEOUT))
                 .route("tracker", api(p -> p.path("/api/applications/**"), props.service("tracker"), DEFAULT_TIMEOUT))
                 .route("notification", api(p -> p.path("/api/notifications/**"), props.service("notification"),

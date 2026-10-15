@@ -340,7 +340,7 @@ public class SuggestionEngine {
     }
 
     /** 6.3 → "6+", 4.0 → "4"; null under a year. */
-    static String yearsText(BigDecimal years) {
+    public static String yearsText(BigDecimal years) {
         if (years == null || years.doubleValue() < 1) {
             return null;
         }

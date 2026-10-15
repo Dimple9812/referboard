@@ -9,6 +9,8 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "referboard.gateway")
 public record GatewayProperties(
         @DefaultValue("http://localhost:5173") List<String> corsAllowedOrigins,
+        /** chrome-extension://&lt;id&gt; origins of the ReferBoard extension (it calls the API with a bearer token). */
+        @DefaultValue("") List<String> extensionOrigins,
         @DefaultValue("false") boolean trustForwardedFor,
         @DefaultValue RateLimits rateLimits,
         Map<String, String> services

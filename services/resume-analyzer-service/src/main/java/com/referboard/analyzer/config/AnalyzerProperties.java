@@ -8,6 +8,8 @@ public record AnalyzerProperties(
         @DefaultValue("5") int freeAnalysesPerMonth,
         @DefaultValue("200") int minJdChars,
         @DefaultValue("30000") int maxJdChars,
-        @DefaultValue("2097152") long maxUploadBytes
+        @DefaultValue("2097152") long maxUploadBytes,
+        @DefaultValue("20") int aiLettersPerDay,
+        @DefaultValue("Asia/Kolkata") String letterTimeZone
 ) {
 }

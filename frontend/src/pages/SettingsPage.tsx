@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Download, FileText } from 'lucide-react';
 import {
-  downloadVersion, useEmailPrefs, useMakePrimary, useProfile, useResumes, useSaveEmailPrefs, useSavePreferences,
+  downloadVersion, useCoverLetters, useDisconnectExtension, useEmailPrefs, useExtensionConnections, useMakePrimary, useProfile, useResumes, useSaveEmailPrefs, useSavePreferences,
   useUploadResume, useUsage, useVersions,
 } from '@/api/queries';
 import { errorMessage } from '@/api/client';
@@ -39,8 +39,10 @@ export default function SettingsPage() {
       <AccountSection />
       <ResumesSection />
       <VersionsSection />
+      <LettersSection />
       <PreferencesSection />
       <EmailSection />
+      <ExtensionSection />
       <UsageSection />
     </div>
   );
@@ -164,6 +166,37 @@ function VersionsSection() {
   );
 }
 
+function LettersSection() {
+  const letters = useCoverLetters();
+  return (
+    <Section title="Cover letters" description="Written from an analysis, using only what your resume says.">
+      {letters.isPending ? <Skeleton className="h-16" />
+        : letters.isError ? <ErrorState error={letters.error} onRetry={() => letters.refetch()} />
+        : letters.data.length === 0 ? (
+          <p className="text-sm text-slate">None yet. Open an analysis in the JD Analyzer and choose Write cover letter.</p>
+        ) : (
+          <ul className="divide-y divide-line rounded border border-line bg-surface">
+            {letters.data.map((l) => (
+              <li key={l.id}>
+                <Link to={`/cover-letters/${l.id}`} className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-ink/[0.02]">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">
+                      {[l.jobTitle, l.companyName].filter(Boolean).join(', ') || 'Cover letter'}
+                    </span>
+                    <span className="text-xs text-slate">
+                      {l.length === 'SHORT' ? 'Short note' : 'One-page letter'}, written {shortDate(l.createdAt)}{l.edited ? ', edited' : ''}
+                    </span>
+                  </span>
+                  {l.origin === 'AI' && <Badge tone="outline">AI draft</Badge>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+    </Section>
+  );
+}
+
 function PreferencesSection() {
   const profile = useProfile();
   const save = useSavePreferences();
@@ -177,6 +210,35 @@ function PreferencesSection() {
             <PreferencesFields draft={draft} />
             <Button type="submit" className="mt-6" loading={save.isPending}>Save preferences</Button>
           </form>
+        )}
+    </Section>
+  );
+}
+
+function ExtensionSection() {
+  const conns = useExtensionConnections();
+  const disconnect = useDisconnectExtension();
+  return (
+    <Section title="Browser extension" description="Save jobs and check your resume from company career pages.">
+      {conns.isPending ? <Skeleton className="h-12" />
+        : conns.isError ? <ErrorState error={conns.error} onRetry={() => conns.refetch()} />
+        : conns.data.length === 0 ? (
+          <p className="text-sm text-slate">Not connected. Install the extension, click its icon and choose Connect. See the README for how to load it.</p>
+        ) : (
+          <ul className="divide-y divide-line rounded border border-line bg-surface">
+            {conns.data.map((c) => (
+              <li key={c.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{c.browser}</p>
+                  <p className="text-xs text-slate">Connected {shortDate(c.connectedAt)}, last used {timeAgo(c.lastUsedAt)}</p>
+                </div>
+                <Button variant="ghost" size="sm" loading={disconnect.isPending && disconnect.variables === c.id}
+                  onClick={() => disconnect.mutate(c.id, { onSuccess: () => toast.success('Extension disconnected') })}>
+                  Disconnect
+                </Button>
+              </li>
+            ))}
+          </ul>
         )}
     </Section>
   );

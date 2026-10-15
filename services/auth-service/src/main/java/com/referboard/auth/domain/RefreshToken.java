@@ -50,13 +50,25 @@ public class RefreshToken {
 
     private String ipAddress;
 
+    /** WEB (cookie) or EXTENSION (held by the browser extension). Rotations keep their family's client. */
+    @Column(nullable = false, updatable = false)
+    private String client;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
+    public enum Client { WEB, EXTENSION }
+
     public static RefreshToken issue(User user, String tokenHash, UUID familyId, Instant expiresAt,
                                      String userAgent, String ipAddress) {
+        return issue(user, tokenHash, familyId, expiresAt, userAgent, ipAddress, Client.WEB);
+    }
+
+    public static RefreshToken issue(User user, String tokenHash, UUID familyId, Instant expiresAt,
+                                     String userAgent, String ipAddress, Client client) {
         RefreshToken token = new RefreshToken();
+        token.client = client.name();
         token.id = UUID.randomUUID();
         token.user = user;
         token.tokenHash = tokenHash;
@@ -65,6 +77,10 @@ public class RefreshToken {
         token.userAgent = truncate(userAgent, 500);
         token.ipAddress = truncate(ipAddress, 64);
         return token;
+    }
+
+    public Client clientType() {
+        return Client.valueOf(client);
     }
 
     public boolean isExpired(Instant now) {

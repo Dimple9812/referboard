@@ -35,7 +35,7 @@ public class SecurityConfig {
 
     /** Reachable without a token. Everything else under /api requires one. */
     static final String[] PUBLIC_POST = {"/api/auth/signup", "/api/auth/login", "/api/auth/google",
-            "/api/auth/refresh", "/api/auth/logout"};
+            "/api/auth/refresh", "/api/auth/logout", "/api/auth/extension/refresh", "/api/auth/extension/disconnect"};
     static final String[] PUBLIC_ANY = {"/api/notifications/unsubscribe", "/.well-known/jwks.json",
             "/actuator/health/**", "/actuator/info", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**",
             "/webjars/**"};
@@ -82,7 +82,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource(GatewayProperties props) {
         CorsConfiguration cors = new CorsConfiguration();
-        cors.setAllowedOrigins(props.corsAllowedOrigins().stream().map(String::trim).filter(s -> !s.isEmpty()).toList());
+        cors.setAllowedOrigins(java.util.stream.Stream.concat(props.corsAllowedOrigins().stream(),
+                        props.extensionOrigins().stream())
+                .map(String::trim).filter(s -> !s.isEmpty()).toList());
         cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Correlation-Id"));
         cors.setExposedHeaders(List.of("X-Correlation-Id", "Content-Disposition", "Retry-After",

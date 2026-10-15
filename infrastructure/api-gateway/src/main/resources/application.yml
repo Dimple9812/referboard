@@ -41,6 +41,9 @@ referboard:
       audience: ${JWT_AUDIENCE:referboard}
   gateway:
     cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    # The browser extension's origin(s). Default: the development build (ID fixed by the key in its manifest).
+    # Add the Chrome Web Store ID once published.
+    extension-origins: ${EXTENSION_ORIGINS:chrome-extension://gjbninchlnhhincbfmmnjjjlhcgooejo}
     # Trust X-Forwarded-For for the client IP only behind a proxy/load balancer you control.
     trust-forwarded-for: ${TRUST_FORWARDED_FOR:false}
     rate-limits:

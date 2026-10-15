@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "ReferBoard",
+  "description": "Save a job to your ReferBoard tracker, check your resume against it and write a cover letter, from the careers page you're on.",
+  "version": "0.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlZEwD0SvN4VgM7mUBvz0YPgTsEaCYxioMpqQW2UM7feTQOvko9GdlSTOCt6nubngvNuwaHfJlRn/hBpIC61aR5Q8gp5Zwa6Ix+9bTqawjyoVqJvyLRYtRLLUlA43jn07bdyY9t7QHMzjMnMwqwtLJvpXZz2EqmWycZjRtRl3n6J+8mg7E5jY9jm5EKytricOOJ5I7gcVlfk7wCm+cUOfByabzYqmhEOhguJrSzdCUsIsSBn0uV9mHTMwAbwKMVC0PIvEuVXEc0/i+jFjyERSBJKz4MRILlGLhHmx219duD5e4HUAGNLYdT60KnlJiO0EPFddlsj456Fb0hk2lS0AcwIDAQAB",
+  "minimum_chrome_version": "116",
+  "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
+  "action": {
+    "default_title": "ReferBoard: save this job or check your resume",
+    "default_popup": "src/popup.html",
+    "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png" }
+  },
+  "background": { "service_worker": "src/background.js", "type": "module" },
+  "permissions": ["activeTab", "scripting", "storage"],
+  "externally_connectable": {
+    "matches": ["http://localhost:3000/*", "http://localhost:5173/*"]
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'"
+  }
+}

@@ -10,6 +10,7 @@ referred instead of applying cold. ReferBoard drafts outreach; **you** always se
 ```mermaid
 flowchart LR
     SPA[React SPA] --> GW[api-gateway]
+    EXT[Chrome extension] --> GW
     GW --> AUTH[auth] & PROF[profile] & JOB[job] & REF[referral] & ANA[resume-analyzer] & TRK[tracker] & NOT[notification]
     ING[ingestion] -- JobUpserted --> K{{Kafka}}
     PROF -- ProfileUpdated --> K
@@ -17,7 +18,7 @@ flowchart LR
     AUTH & PROF & ING & JOB & REF & ANA & TRK & NOT --- PG[(Postgres + pgvector)]
 ```
 
-## Build status (Phase 1)
+## Build status (Phases 1 and 2)
 
 | Module | Status | Tests |
 |---|---|---|
@@ -27,16 +28,17 @@ flowchart LR
 | skills | ✅ | 7 — aliases (K8s→Kubernetes), ambiguous words ("Go", "Excel"), extraction offsets |
 | ai-client | ✅ | 9 — Claude/OpenAI request shape, retries on 429/5xx/529, no retry on 4xx, embeddings |
 | discovery-server | ✅ | boots, health UP |
-| auth-service | ✅ | 16 unit + 8 integration (real Postgres, embedded Kafka) |
+| auth-service | ✅ | 16 unit + 9 integration (real Postgres, embedded Kafka; web and extension sessions) |
 | profile-service | ✅ | 21 unit + 5 integration (real PDF/DOCX → parse → pgvector → Kafka; concurrent-onboarding race) |
 | ingestion-service | ✅ | 54 unit + 2 integration (4 simulated runs over 61 days against mock ATS APIs; force-republish) |
 | job-service | ✅ | 5 unit + 4 integration (events → FTS/trigram/pgvector search, Redis cache, matches, DLT, digest) |
 | referral-service | ✅ | 34 unit + 5 integration (Feign → mock job/profile/Claude APIs, draft guard, pipeline events, reminders on a movable clock) |
-| resume-analyzer-service | ✅ | 29 unit + 7 integration (LLM + heuristic paths, truth guard, tailored DOCX/PDF, free-tier limit, JD cache) |
+| resume-analyzer-service | ✅ | 38 unit + 8 integration (LLM + heuristic paths, truth guard, tailored DOCX/PDF, cover letters and their guard, free-tier limit, JD cache) |
 | tracker-service | ✅ | 7 unit + 6 integration (board API, drag-and-drop ordering, referral/resume/closed-job events, create race) |
 | notification-service | ✅ | 5 unit + 6 integration (real SMTP via GreenMail: escaping, outage + retry, one-click unsubscribe, daily cap, dedup) |
 | api-gateway | ✅ | 5 unit + 9 integration (edge JWT via JWKS, CORS, Redis token buckets, fail-open, JSON errors, docs aggregation) |
 | frontend | ✅ | 13 unit (token refresh, board moves, formatting) + Playwright smoke on desktop and mobile against the live stack |
+| extension (Phase 2) | ✅ | 21 unit (site rules, page reading, session refresh, popup) + Playwright with the extension loaded in Chromium |
 
 ## Run locally with Docker
 
@@ -172,6 +174,20 @@ components (dialog/sheet, tabs), dnd-kit for the tracker board, sonner for toast
   nginx overwrites `X-Forwarded-For` with the client address; the gateway trusts it
   (`TRUST_FORWARDED_FOR=true`) and is published on localhost only, so the header can't be spoofed from outside.
 
+## How the browser extension works
+
+`extension/` is a Chrome (MV3) extension with no build step: **Load unpacked** in `chrome://extensions`. On a
+careers page, click its icon to save the job to the tracker, check your resume against it, and write a cover
+letter. It reads a page only on that click, and only the schema.org JobPosting data careers sites publish for search
+engines (or text you selected). It never runs on LinkedIn, Naukri, Indeed or other job boards, where you paste the
+description instead. It never sends messages.
+
+To connect, the signed-in web app (`/connect-extension`) creates an extension session after you approve it, and
+hands it to the extension with `chrome.runtime.sendMessage`. That only works for the extension IDs in
+`EXTENSION_IDS` and from the origins in the manifest. Extension sessions are separate, rotating, revocable token
+families (`/api/auth/extension/*`), shown in **Settings → Browser extension**. Details are in
+[`extension/README.md`](extension/README.md).
+
 ## How the referral assistant works
 
 ReferBoard never visits LinkedIn and never sends anything. For a job, `GET /api/referrals/jobs/{jobId}/suggestions`
@@ -248,6 +264,25 @@ to pick another resume or a tailored version.
 6. **Tailored resume.** `POST /api/analyses/{id}/resume` with your accept/reject decisions (and confirmations)
    creates a version linked to the job, publishes `resume.version-created.v1` (the tracker attaches it to the
    job's card), and `GET /api/resume-versions/{id}/file?format=DOCX|PDF` renders an ATS-friendly single-column file.
+
+## How cover letters work
+
+From an analysis (in the web app or the extension), `POST /api/analyses/{id}/cover-letters` writes a letter for
+that job from that resume. You choose a length: `STANDARD` is one page, `SHORT` is a few sentences for an email or
+a referral form. You can add a line on why this company, which is used as written and never invented.
+
+- **The facts come only from your resume.** The letter can use your current title and years, the skills the posting
+  asks for that your resume shows, and two or three of your own bullets that best show them (told newest first).
+  It can also use your note, if you gave one.
+- **AI letters must pass a guard.** With an LLM configured, the draft is AI-written and then checked by
+  `LetterGuard`. A letter is rejected if it has a number that isn't in your resume or note, a skill your resume
+  doesn't mention, a placeholder, or promises you didn't make (notice period, relocation, references). It's also
+  rejected if it's missing the greeting or your name, or is too long. A rejected or failed draft, no LLM, or
+  more than `ANALYZER_AI_LETTERS_PER_DAY` (20) AI letters in a day means the template letter is used instead, and
+  the response says why.
+- **Then it's yours.** Edit it on its page (`PUT /api/cover-letters/{id}` with the version you edited; a stale
+  version gets 409), restore the first draft, copy it, or download DOCX or PDF (`/file?format=`). Letters are
+  listed in Settings.
 
 Free users get `ANALYZER_FREE_PER_MONTH` analyses (default 5); re-running the same JD against the same resume
 within 24 hours returns the stored report without counting. Users with the `PRO` or `ADMIN` role are unlimited

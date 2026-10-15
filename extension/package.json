@@ -1,0 +1,15 @@
+{
+  "name": "referboard-extension",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "ReferBoard browser extension (Chrome, Manifest V3). No build step: load this folder unpacked.",
+  "scripts": {
+    "test": "vitest run",
+    "package": "node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0",
+    "vitest": "3.2.7"
+  }
+}

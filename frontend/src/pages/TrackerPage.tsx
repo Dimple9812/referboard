@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   closestCorners, DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDroppable, useSensor, useSensors,
   type DragEndEvent, type DragOverEvent, type DragStartEvent,
@@ -29,7 +29,13 @@ export default function TrackerPage() {
   const [cols, setCols] = useState<Columns>(toColumns());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [start, setStart] = useState<{ stage: Stage; index: number } | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  // ?card=<id> opens that card (links from the extension and from notifications).
+  const [params, setParams] = useSearchParams();
+  const [open, setOpenState] = useState<string | null>(params.get('card'));
+  const setOpen = (id: string | null) => {
+    setOpenState(id);
+    if (!id && params.has('card')) setParams({}, { replace: true });
+  };
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {

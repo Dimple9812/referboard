@@ -85,6 +85,8 @@ referboard:
     min-jd-chars: 200
     max-jd-chars: 30000
     max-upload-bytes: 2097152
+    ai-letters-per-day: ${ANALYZER_AI_LETTERS_PER_DAY:20}   # beyond this, letters use the template (no model call)
+    letter-time-zone: ${LETTER_TIME_ZONE:Asia/Kolkata}      # the date printed on downloaded letters
 
 springdoc:
   api-docs:

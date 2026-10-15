@@ -46,4 +46,17 @@ class RenderersTest {
     void pdfDropsCharactersStandardFontsCantShow() {
         assertThat(PdfRenderer.clean("Résumé — नमस्ते ok ✓")).isEqualTo("Résumé —  ok -");
     }
+
+    @Test
+    void lettersKeepParagraphsAndLineBreaksInBothFormats() throws Exception {
+        LetterRenderer.Letter l = new LetterRenderer.Letter("Asha Rao", "asha.rao@example.com | Bengaluru",
+                "15 October 2026", "Dear Hiring Team at Northwind,\n\nI'm applying for the role.\n\nRegards,\nAsha Rao");
+        assertThat(LetterRenderer.paragraphs(l.body())).hasSize(3);
+        Extracted docx = extract(LetterRenderer.docx(l));
+        assertThat(docx.text()).contains("Asha Rao", "15 October 2026", "Dear Hiring Team at Northwind,",
+                "I'm applying for the role.", "Regards,\nAsha Rao");
+        Extracted pdf = extract(LetterRenderer.pdf(l));
+        assertThat(pdf.metadata().get("xmpTPg:NPages")).isEqualTo("1");
+        assertThat(pdf.text()).contains("asha.rao@example.com | Bengaluru", "I'm applying for the role.", "Regards,");
+    }
 }

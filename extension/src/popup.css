@@ -1,0 +1,60 @@
+@font-face { font-family: 'Bricolage Grotesque'; src: url('../fonts/bricolage-grotesque-latin-wght-normal.woff2') format('woff2'); font-weight: 200 800; }
+@font-face { font-family: 'IBM Plex Sans'; src: url('../fonts/ibm-plex-sans-latin-400-normal.woff2') format('woff2'); font-weight: 400; }
+@font-face { font-family: 'IBM Plex Sans'; src: url('../fonts/ibm-plex-sans-latin-500-normal.woff2') format('woff2'); font-weight: 500 700; }
+
+:root {
+  --ink: #1B2440; --ink-soft: #3A4360; --paper: #F6F7FA; --surface: #FFFFFF; --line: #DCE1EA; --line-strong: #C3CAD8;
+  --slate: #5B6478; --fit: #17785A; --fit-soft: #E3F2EC; --danger: #B42318; --danger-soft: #FDECEA; --warn: #A15C07;
+  --warn-soft: #FDF1E3; --marigold: #E3A008;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  width: 360px; min-height: 200px; background: var(--paper); color: var(--ink);
+  font: 13px/1.5 'IBM Plex Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+}
+body.page { width: auto; max-width: 420px; margin: 24px auto; }   /* opened as a tab */
+.top { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.brand { font: 600 15px 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.01em; }
+main { padding: 16px; }
+h1 { font: 600 17px/1.3 'Bricolage Grotesque', system-ui, sans-serif; margin: 0 0 6px; letter-spacing: -0.01em; }
+p { margin: 0 0 10px; }
+.muted { color: var(--slate); }
+.small { font-size: 12px; }
+.note { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 6px; margin-bottom: 14px; font-size: 12px; }
+.note.ok { background: var(--surface); border: 1px solid var(--line); color: var(--ink-soft); }
+.note.info { background: var(--surface); border: 1px solid var(--line); color: var(--ink-soft); }
+.note.warn { background: var(--warn-soft); color: var(--ink); }
+.note .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; flex: none; background: currentColor; }
+.note.ok .dot { background: var(--fit); }
+.note.warn .dot { background: var(--warn); }
+label { display: block; font-weight: 500; margin: 10px 0 4px; }
+input, textarea, select {
+  width: 100%; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: 6px; padding: 7px 9px;
+}
+textarea { resize: vertical; min-height: 96px; line-height: 1.45; }
+input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--marigold); outline-offset: 1px;
+}
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hint { color: var(--slate); font-size: 12px; margin-top: 4px; }
+.actions { display: flex; gap: 8px; margin-top: 14px; }
+button {
+  font: 500 13px 'IBM Plex Sans', system-ui, sans-serif; border-radius: 6px; padding: 8px 12px; cursor: pointer;
+  border: 1px solid var(--ink); background: var(--ink); color: var(--paper);
+}
+button.secondary { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
+button.link { background: none; border: 0; color: var(--ink); padding: 0; text-decoration: underline; text-underline-offset: 3px; }
+button:disabled { opacity: 0.55; cursor: default; }
+.actions button { flex: 1; }
+.result { margin-top: 16px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.result.error { border-color: rgba(180, 35, 24, 0.3); background: var(--danger-soft); }
+.score { display: flex; align-items: baseline; gap: 10px; }
+.score b { font: 600 34px/1 'Bricolage Grotesque', system-ui, sans-serif; color: var(--fit); font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 10px; }
+.chip { border: 1px solid var(--line-strong); color: var(--slate); border-radius: 4px; padding: 1px 6px; font-size: 12px; }
+.links { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+footer { display: flex; justify-content: space-between; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); color: var(--slate); font-size: 12px; }
+footer span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

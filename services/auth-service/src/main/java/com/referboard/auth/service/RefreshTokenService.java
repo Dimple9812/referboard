@@ -51,16 +51,26 @@ public class RefreshTokenService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public Issued issue(User user, UUID familyId, ClientInfo client) {
+        return issue(user, familyId, client, RefreshToken.Client.WEB);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Issued issue(User user, UUID familyId, ClientInfo client, RefreshToken.Client type) {
         String raw = newRawToken();
         RefreshToken token = RefreshToken.issue(user, hash(raw), familyId,
-                clock.instant().plus(props.jwt().refreshTokenTtl()), client.userAgent(), client.ipAddress());
+                clock.instant().plus(props.jwt().refreshTokenTtl()), client.userAgent(), client.ipAddress(), type);
         repository.save(token);
         return new Issued(raw, token);
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
     public Issued startFamily(User user, ClientInfo client) {
-        return issue(user, UUID.randomUUID(), client);
+        return issue(user, UUID.randomUUID(), client, RefreshToken.Client.WEB);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Issued startFamily(User user, ClientInfo client, RefreshToken.Client type) {
+        return issue(user, UUID.randomUUID(), client, type);
     }
 
     /**
@@ -70,16 +80,25 @@ public class RefreshTokenService {
      */
     @Transactional(noRollbackFor = ApiException.class)
     public Rotation rotate(String rawToken, ClientInfo client) {
+        return rotate(rawToken, client, RefreshToken.Client.WEB);
+    }
+
+    /** As {@link #rotate(String, ClientInfo)}, for a token of the given client type only (others are just invalid). */
+    @Transactional(noRollbackFor = ApiException.class)
+    public Rotation rotate(String rawToken, ClientInfo client, RefreshToken.Client expected) {
         Instant now = clock.instant();
         RefreshToken current = repository.findByTokenHashForUpdate(hash(rawToken))
                 .orElseThrow(RefreshTokenService::invalid);
+        if (current.clientType() != expected) {
+            throw invalid();
+        }
 
         if (current.isRevoked() && lostResponseRetry(current, now) && current.getUser().isActive()
                 && current.getUser().getDeletedAt() == null) {
             // The client never received (or never stored) the successor: give it a token instead of a sign-out.
             log.info("Refresh token for user {} presented again within the grace period; issuing a new one",
                     current.getUser().getId());
-            return new Rotation(current.getUser(), issue(current.getUser(), current.getFamilyId(), client));
+            return new Rotation(current.getUser(), issue(current.getUser(), current.getFamilyId(), client, expected));
         }
         if (current.isRevoked()) {
             int revoked = repository.revokeFamily(current.getFamilyId(), now);
@@ -95,7 +114,7 @@ public class RefreshTokenService {
             repository.revokeFamily(current.getFamilyId(), now);
             throw ApiException.forbidden("ACCOUNT_DISABLED", "This account is disabled");
         }
-        Issued next = issue(user, current.getFamilyId(), client);
+        Issued next = issue(user, current.getFamilyId(), client, expected);
         current.revoke(now, next.entity().getId());
         return new Rotation(user, next);
     }

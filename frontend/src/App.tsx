@@ -16,6 +16,8 @@ const ReferralsPage = lazy(() => import('@/pages/ReferralsPage'));
 const TrackerPage = lazy(() => import('@/pages/TrackerPage'));
 const NotificationsPage = lazy(() => import('@/pages/NotificationsPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
+const CoverLetterPage = lazy(() => import('@/pages/CoverLetterPage'));
+const ConnectExtensionPage = lazy(() => import('@/pages/ConnectExtensionPage'));
 
 export default function App() {
   return (
@@ -39,6 +41,8 @@ export default function App() {
             <Route path="/tracker" element={<TrackerPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/cover-letters/:id" element={<CoverLetterPage />} />
+            <Route path="/connect-extension" element={<ConnectExtensionPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

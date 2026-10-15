@@ -16,7 +16,9 @@ export default defineConfig({
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH } : {},
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
-    { name: 'mobile', use: { ...devices['Pixel 7'] } },
+    { name: 'desktop', testIgnore: /extension\.spec/, use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    { name: 'mobile', testIgnore: /extension\.spec/, use: { ...devices['Pixel 7'] } },
+    // Loads ../extension into Chromium; the web app must be on http://localhost:3000 (allowed by the manifest).
+    { name: 'extension', testMatch: /extension\.spec/ },
   ],
 });

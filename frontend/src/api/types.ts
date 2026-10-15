@@ -164,6 +164,21 @@ export interface ResumeVersion {
   downloadPath: string;
 }
 
+// ---------- cover letters ----------
+export type LetterLength = 'STANDARD' | 'SHORT';
+export interface CoverLetter {
+  id: string; analysisId?: string | null; jobId?: string | null; jobTitle?: string | null; companyName?: string | null;
+  length: LetterLength; origin: 'TEMPLATE' | 'AI'; body: string; generatedBody?: string | null; edited: boolean;
+  motivation?: string | null; notices?: string[] | null; createdAt: string; updatedAt?: string | null; version: number;
+  downloadPath: string;
+}
+
+// ---------- extension ----------
+export interface ExtensionConnection { id: string; connectedAt: string; lastUsedAt: string; browser: string }
+export interface ExtensionTokens {
+  accessToken: string; tokenType: string; expiresIn: number; refreshToken: string; refreshExpiresIn: number; user: User;
+}
+
 // ---------- notifications ----------
 export interface AppNotification {
   id: string; type: 'REFERRAL_REMINDER' | 'DAILY_DIGEST' | 'WELCOME' | 'SYSTEM'; title: string; body: string;

@@ -141,8 +141,9 @@ users (
 
 refresh_tokens (
   id uuid pk, user_id fk→users, token_hash varchar(64) unique, family_id uuid,
-  expires_at, revoked_at, replaced_by uuid, user_agent, ip_address, created_at)
-  index (user_id), (family_id), (expires_at)
+  expires_at, revoked_at, replaced_by uuid, user_agent, ip_address, created_at,
+  client ('WEB'|'EXTENSION'))   -- a token only works on its own client's refresh endpoint
+  index (user_id), (family_id), (expires_at), (user_id, client) where revoked_at is null
 ```
 
 ### 4.2 `profile` — profile-service ✅ implemented
@@ -364,6 +365,11 @@ resume_versions (id, user_id, name, job_id null, analysis_id fk null, base_sourc
 
 usage_counters (user_id, period char(7) /* YYYY-MM UTC */, analyses int, pk (user_id, period))
 
+cover_letters (id, user_id, analysis_id fk null, job_id null, job_title, company_name,
+  length ('STANDARD'|'SHORT'), origin ('TEMPLATE'|'AI'), model, motivation /* the user's words */,
+  sender_name, sender_contact, generated_body, body /* last saved by the user */, created_at, updated_at,
+  deleted_at, version)
+
 outbox_events, processed_events
 ```
 
@@ -502,6 +508,13 @@ requires a new `.v2` topic, with the producer dual-writing until consumers migra
   within `JWT_REFRESH_REUSE_GRACE` (30 s) when its successor has never been used. That case is a response
   lost in flight (reload mid-refresh, two tabs at once), and it gets a fresh token instead of a sign-out.
 - Web app: access token in memory only; one in-flight refresh shared by every caller; strict CSP from nginx.
+- Browser extension: its own token families (`client = 'EXTENSION'`). The signed-in web app creates one on the
+  user's explicit Connect (`POST /api/auth/extension/connect`) and hands it over with `chrome.runtime.sendMessage`,
+  only to known extension IDs. The extension rotates the refresh token in the request body
+  (`/api/auth/extension/refresh`, same reuse detection and grace period). At most five live connections per user;
+  they're listed and revocable in Settings. The gateway accepts the extension's origin (`EXTENSION_ORIGINS`).
+- Extension permissions: `activeTab`, `scripting`, `storage` only. Pages are read on click, only their schema.org
+  JobPosting JSON-LD or the user's selection, never on job boards (LinkedIn, Naukri, Indeed, …).
 - Password: bcrypt via `DelegatingPasswordEncoder` (`{bcrypt}` prefix allows upgrading the algorithm later;
   hashes are upgraded on login). 8–72 chars, letter + digit.
 - Brute force: 5 failures → 15 min lockout per account (auth-service) + per-IP rate limit on sign-in and sign-up
@@ -531,4 +544,7 @@ requires a new `.v2` topic, with the producer dual-writing until consumers migra
 - **Hard constraints:** no scraping of LinkedIn/Naukri/Indeed or any site whose terms prohibit it; ingestion
   only calls documented public board APIs and Adzuna. No automated LinkedIn actions; the app only drafts text and
   builds search URLs the user opens. Resume tailoring only rephrases/reorders existing content; any skill not
-  present in the resume is flagged "Add only if you have this experience" and needs explicit confirmation.
+  present in the resume is flagged "Add only if you have this experience" and needs explicit confirmation. Cover
+  letters use only resume facts and the user's own note; AI letters that add a number or skill are discarded for the
+  template letter. The extension reads pages only on click, only JobPosting JSON-LD or the user's selection, and
+  never on job boards.

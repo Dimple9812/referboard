@@ -1,8 +1,9 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import type {
-  AnalysisReport, AnalysisSummary, AppNotification, Board, CardDetail, Contact, ContactDetail, ContactPage,
-  ContactStatus, DraftSet, EmailPreferences, JobDetail, JobPage, JobSearch, NotificationPage, PersonType, Pipeline,
+  AnalysisReport, AnalysisSummary, AppNotification, Board, CardDetail, Contact, ContactDetail, ContactPage, CoverLetter,
+  LetterLength,
+  ContactStatus, DraftSet, ExtensionConnection, EmailPreferences, JobDetail, JobPage, JobSearch, NotificationPage, PersonType, Pipeline,
   Preferences, Profile, Reminder, Resume, ResumeVersion, Stage, Suggestions, Usage,
 } from './types';
 
@@ -27,6 +28,9 @@ export const keys = {
   analysis: (id: string) => ['analysis', id] as const,
   usage: ['analyses', 'usage'] as const,
   versions: ['versions'] as const,
+  letters: (jobId?: string) => ['letters', jobId ?? 'all'] as const,
+  letter: (id: string) => ['letter', id] as const,
+  extensions: ['extensions'] as const,
   notifications: ['notifications'] as const,
   unread: ['notifications', 'unread'] as const,
   emailPrefs: ['notifications', 'prefs'] as const,
@@ -312,16 +316,73 @@ export function useGenerateResume() {
 export const useVersions = () => useQuery({ queryKey: keys.versions, queryFn: () => get<ResumeVersion[]>('/api/resume-versions') });
 
 /** Downloads through the API client (the token is in memory, so a plain link can't authenticate). */
-export async function downloadVersion(id: string, format: 'DOCX' | 'PDF') {
-  const r = await api.get<Blob>(`/api/resume-versions/${id}/file`, { params: { format }, responseType: 'blob' });
+async function downloadFile(path: string, format: 'DOCX' | 'PDF', fallbackName: string) {
+  const r = await api.get<Blob>(path, { params: { format }, responseType: 'blob' });
   const disposition = r.headers['content-disposition'] as string | undefined;
-  const name = /filename="?([^";]+)"?/.exec(disposition ?? '')?.[1] ?? `resume.${format.toLowerCase()}`;
+  const name = /filename="?([^";]+)"?/.exec(disposition ?? '')?.[1] ?? `${fallbackName}.${format.toLowerCase()}`;
   const url = URL.createObjectURL(r.data);
   const a = document.createElement('a');
   a.href = url;
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export const downloadVersion = (id: string, format: 'DOCX' | 'PDF') =>
+  downloadFile(`/api/resume-versions/${id}/file`, format, 'resume');
+
+// ---------- cover letters ----------
+export const useCoverLetters = (jobId?: string) =>
+  useQuery({ queryKey: keys.letters(jobId), queryFn: () => get<CoverLetter[]>('/api/cover-letters', jobId ? { jobId } : undefined) });
+
+export const useCoverLetter = (id: string) =>
+  useQuery({ queryKey: keys.letter(id), queryFn: () => get<CoverLetter>(`/api/cover-letters/${id}`) });
+
+export function useWriteLetter(analysisId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { length: LetterLength; motivation?: string }) =>
+      api.post<CoverLetter>(`/api/analyses/${analysisId}/cover-letters`, body).then((r) => r.data),
+    onSuccess: (l) => {
+      qc.setQueryData(keys.letter(l.id), l);
+      qc.invalidateQueries({ queryKey: ['letters'] });
+    },
+  });
+}
+
+export function useSaveLetter(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { body: string; version: number }) => api.put<CoverLetter>(`/api/cover-letters/${id}`, body).then((r) => r.data),
+    onSuccess: (l) => {
+      // Keep the notices from creation; the server only returns them once.
+      qc.setQueryData<CoverLetter>(keys.letter(id), (old) => ({ ...l, notices: old?.notices ?? null }));
+      qc.invalidateQueries({ queryKey: ['letters'] });
+    },
+  });
+}
+
+export function useDeleteLetter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/api/cover-letters/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['letters'] }),
+  });
+}
+
+export const downloadLetter = (id: string, format: 'DOCX' | 'PDF') =>
+  downloadFile(`/api/cover-letters/${id}/file`, format, 'cover-letter');
+
+// ---------- browser extension ----------
+export const useExtensionConnections = () =>
+  useQuery({ queryKey: keys.extensions, queryFn: () => get<ExtensionConnection[]>('/api/auth/extension/connections') });
+
+export function useDisconnectExtension() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/api/auth/extension/connections/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.extensions }),
+  });
 }
 
 // ---------- notifications ----------
