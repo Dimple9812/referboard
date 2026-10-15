@@ -35,8 +35,8 @@ flowchart LR
 | resume-analyzer-service | ✅ | 28 unit + 7 integration (LLM + heuristic paths, truth guard, tailored DOCX/PDF, free-tier limit, JD cache) |
 | tracker-service | ✅ | 7 unit + 6 integration (board API, drag-and-drop ordering, referral/resume/closed-job events, create race) |
 | notification-service | ✅ | 5 unit + 6 integration (real SMTP via GreenMail: escaping, outage + retry, one-click unsubscribe, daily cap, dedup) |
-| api-gateway | ⏳ next | |
-| frontend | ⏳ | |
+| api-gateway | ✅ | 5 unit + 9 integration (edge JWT via JWKS, CORS, Redis token buckets, fail-open, JSON errors, docs aggregation) |
+| frontend | ⏳ next | |
 
 ## Run locally with Docker
 
@@ -48,6 +48,8 @@ docker compose --profile tools up kafka-ui   # optional Kafka UI on :8090
 
 | URL | What |
 |---|---|
+| http://localhost:8080 | **API gateway: the only address the frontend uses** |
+| http://localhost:8080/swagger-ui.html | all services' API docs in one Swagger UI (requests go through the gateway) |
 | http://localhost:8761 | Eureka dashboard |
 | http://localhost:8081/swagger-ui.html | auth-service API docs |
 | http://localhost:8081/.well-known/jwks.json | public signing keys |
@@ -151,6 +153,27 @@ and publishes `referral.status-changed.v1`. Two reminders are scheduled automati
 still in that status: *connected 2 days ago → send your referral message* and *no reply 5 days after asking → follow
 up* (`referral.reminder-due.v1`, with a drafted message; notification-service will email them). Tune with
 `REFERRAL_SEND_REFERRAL_AFTER` / `REFERRAL_FOLLOW_UP_AFTER` (ISO-8601 durations).
+
+## How the API gateway works
+
+Everything the frontend calls goes to `http://localhost:8080/api/...`. The gateway:
+
+- **Routes by path** to services found through Eureka (`/api/auth` → auth-service, `/api/jobs` → job-service,
+  `/api/analyses` and `/api/resume-versions` → resume-analyzer-service, and so on). Only `/api/**`, the JWKS and the
+  API docs are routed; services' actuator endpoints are never exposed. LLM-backed services get a 120 s timeout,
+  others 30 s.
+- **Validates the JWT at the edge** (signature from auth-service's JWKS, issuer, audience, expiry); invalid tokens
+  never reach a service, and services validate again. Sign-up, login, refresh, logout, the JWKS and the email
+  unsubscribe link are public.
+- **Rate limits with Redis token buckets:** 120 requests/min per user (per IP when signed out), 10/min per IP for
+  sign-in, sign-up and refresh, 10/min per user for LLM-backed calls (JD analysis, message drafts, resume upload).
+  Over the limit → 429 with `Retry-After`. If Redis is down, requests are allowed (fail open) and a warning is
+  logged once a minute.
+- **CORS** for `CORS_ALLOWED_ORIGINS` only, with credentials (the refresh cookie).
+- **Correlation ids:** keeps a sane `X-Correlation-Id` from the client or creates one, passes it to the service
+  (which logs it), returns it once on the response, and writes one access-log line per request.
+- **Errors in one JSON shape:** unknown path → 404, missing/invalid token → 401, service down or unresolvable →
+  503, too slow → 504; service errors pass through unchanged.
 
 ## How the JD Match Analyzer works
 

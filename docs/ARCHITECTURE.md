@@ -514,7 +514,15 @@ requires a new `.v2` topic, with the producer dual-writing until consumers migra
   echo it on responses, copy it into event metadata and Kafka headers; consumers restore it. Structured JSON
   logs via `LOG_FORMAT=ecs`.
 - **Health:** Actuator liveness/readiness probes on every service.
-- **API docs:** springdoc per service; the gateway aggregates `/v3/api-docs` of each route into one Swagger UI.
+- **API docs:** springdoc per service; the gateway routes `/v3/api-docs/{service}` to each service and rewrites the
+  OpenAPI `servers` to the gateway origin, so one Swagger UI lists every service and "Try it out" goes through the
+  gateway (auth, CORS, rate limits).
+- **Gateway (implemented):** Spring Cloud Gateway 4.3 (WebFlux). Routes in code (`GatewayRoutes`), `lb://` via
+  Eureka or URL overrides; reactive resource server with the same iss/aud/exp validation as the services;
+  `RateLimitFilter` + `TokenBucket` (one Lua script, Redis server time, fail-open on Redis errors/timeouts);
+  `CorrelationIdFilter` (highest precedence, so even 401/429 carry the id); `GatewayErrorHandler` maps gateway
+  failures (no route, connect/DNS failure, timeout) to the shared error JSON; X-Forwarded-* only for
+  `TRUSTED_PROXIES`.
 - **Hard constraints:** no scraping of LinkedIn/Naukri/Indeed or any site whose terms prohibit it; ingestion
   only calls documented public board APIs and Adzuna. No automated LinkedIn actions; the app only drafts text and
   builds search URLs the user opens. Resume tailoring only rephrases/reorders existing content; any skill not

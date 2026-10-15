@@ -92,6 +92,29 @@ services:
       interval: 10s
       retries: 20
 
+  # Single entry point for the frontend: http://localhost:8080 (API) and /swagger-ui.html (all services' docs).
+  api-gateway:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args: { MODULE: infrastructure/api-gateway }
+    ports: ["8080:8080"]
+    environment:
+      EUREKA_URL: http://discovery-server:8761/eureka
+      JWKS_URI: http://auth-service:8081/.well-known/jwks.json
+      JWT_ISSUER: ${JWT_ISSUER:-referboard-auth}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-referboard}
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ${LOG_FORMAT:-ecs}
+      REDIS_HOST: redis
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      RATE_LIMIT_REQUESTS_PER_MINUTE: ${RATE_LIMIT_REQUESTS_PER_MINUTE:-120}
+      AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-10}
+      EXPENSIVE_RATE_LIMIT_PER_MINUTE: ${EXPENSIVE_RATE_LIMIT_PER_MINUTE:-10}
+      TRUST_FORWARDED_FOR: ${TRUST_FORWARDED_FOR:-false}
+    depends_on:
+      discovery-server: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
   auth-service:
     build:
       context: .

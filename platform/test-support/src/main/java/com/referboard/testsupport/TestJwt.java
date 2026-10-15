@@ -42,6 +42,11 @@ public final class TestJwt {
         }
     }
 
+    /** The public signing key as a JWKS document, for components that fetch keys over HTTP (e.g. the gateway). */
+    public static String jwksJson() {
+        return new JWKSet(KEY.toPublicJWK()).toString();
+    }
+
     public static String tokenFor(UUID userId) {
         return token(userId, ISSUER, AUDIENCE, Instant.now().plusSeconds(900));
     }
