@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
  *   <li>AUTH — sign-in, sign-up: per client IP, strict (credential stuffing). Refresh is not here: it needs an
  *       unguessable 256-bit cookie, runs on every page load, and a strict per-IP bucket would sign out
  *       everyone behind a shared office or campus IP;</li>
- *   <li>EXPENSIVE — calls that run an LLM (JD analysis, cover letters, message drafts, resume upload/parse): per user;</li>
+ *   <li>EXPENSIVE — calls that run an LLM (JD analysis, cover letters, interview prep, message drafts, resume upload/parse): per user;</li>
  *   <li>DEFAULT — every other API call: per user, or per IP when anonymous.</li>
  * </ul>
  */
@@ -21,7 +21,7 @@ public final class RateLimitPolicy {
 
     private static final Pattern AUTH = Pattern.compile("^/api/auth/(login|signup|google)$");
     private static final Pattern EXPENSIVE = Pattern.compile(
-            "^/api/analyses(/upload|/[^/]+/cover-letters)?$|^/api/referrals/contacts/[^/]+/drafts$|^/api/profile/resumes(/[^/]+/reparse)?$");
+            "^/api/analyses(/upload|/[^/]+/cover-letters|/[^/]+/interview-prep)?$|^/api/referrals/contacts/[^/]+/drafts$|^/api/profile/resumes(/[^/]+/reparse)?$");
 
     private RateLimitPolicy() {
     }

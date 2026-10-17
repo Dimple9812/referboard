@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "properties": {
+    "questions": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": { "type": "string", "description": "One interview question an interviewer for this role is likely to ask." },
+          "why": { "type": "string", "description": "One sentence: what the interviewer is checking." },
+          "pointers": { "type": "array", "maxItems": 5, "items": { "type": "string" }, "description": "Points a strong answer covers." }
+        },
+        "required": ["question", "why", "pointers"]
+      }
+    }
+  },
+  "required": ["questions"]
+}

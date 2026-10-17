@@ -11,7 +11,7 @@ declare
     svc text;
 begin
     foreach svc in array array['auth', 'profile', 'job', 'ingestion', 'referral', 'analyzer', 'tracker',
-                               'notification']
+                               'notification', 'billing', 'interview', 'analytics']
     loop
         if not exists (select 1 from pg_roles where rolname = svc || '_svc') then
             execute format('create role %I login password %L', svc || '_svc', svc || '_svc');

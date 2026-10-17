@@ -43,7 +43,7 @@ public class AccessTokenService {
                 .expiresAt(now.plus(props.jwt().accessTokenTtl()))
                 .claim("email", user.getEmail())
                 .claim("name", user.getFullName())
-                .claim("roles", List.of(user.getRole().name()))
+                .claim("roles", user.effectiveRoles(now))
                 .build();
         JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).type("JWT").build();
         return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

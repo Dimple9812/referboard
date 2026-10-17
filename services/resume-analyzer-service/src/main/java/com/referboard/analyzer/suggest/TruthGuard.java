@@ -60,7 +60,7 @@ public final class TruthGuard {
     }
 
     /** First number token in {@code text} that {@code source} doesn't contain as a whole token. */
-    static Optional<String> newNumber(String source, String text) {
+    public static Optional<String> newNumber(String source, String text) {
         Set<String> known = new HashSet<>();
         Matcher s = NUMBER.matcher(source);
         while (s.find()) {

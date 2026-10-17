@@ -3,7 +3,7 @@ import { api } from './client';
 import type {
   AnalysisReport, AnalysisSummary, AppNotification, Board, CardDetail, Contact, ContactDetail, ContactPage, CoverLetter,
   LetterLength,
-  ContactStatus, DraftSet, ExtensionConnection, EmailPreferences, JobDetail, JobPage, JobSearch, NotificationPage, PersonType, Pipeline,
+  Confidence, ContactStatus, DraftSet, ExtensionConnection, InterviewPrep, PrepItem, PrepSummary, EmailPreferences, JobDetail, JobPage, JobSearch, NotificationPage, PersonType, Pipeline,
   Preferences, Profile, Reminder, Resume, ResumeVersion, Stage, Suggestions, Usage,
 } from './types';
 
@@ -31,6 +31,8 @@ export const keys = {
   letters: (jobId?: string) => ['letters', jobId ?? 'all'] as const,
   letter: (id: string) => ['letter', id] as const,
   extensions: ['extensions'] as const,
+  preps: (jobId?: string) => ['preps', jobId ?? 'all'] as const,
+  prep: (id: string) => ['prep', id] as const,
   notifications: ['notifications'] as const,
   unread: ['notifications', 'unread'] as const,
   emailPrefs: ['notifications', 'prefs'] as const,
@@ -372,6 +374,53 @@ export function useDeleteLetter() {
 
 export const downloadLetter = (id: string, format: 'DOCX' | 'PDF') =>
   downloadFile(`/api/cover-letters/${id}/file`, format, 'cover-letter');
+
+// ---------- interview prep ----------
+export const usePreps = (jobId?: string, enabled = true) =>
+  useQuery({ queryKey: keys.preps(jobId), queryFn: () => get<PrepSummary[]>('/api/interview-preps', jobId ? { jobId } : undefined), enabled });
+
+export const usePrep = (id: string) =>
+  useQuery({ queryKey: keys.prep(id), queryFn: () => get<InterviewPrep>(`/api/interview-preps/${id}`) });
+
+export function useMakePrep() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (analysisId: string) => api.post<InterviewPrep>(`/api/analyses/${analysisId}/interview-prep`).then((r) => r.data),
+    onSuccess: (p) => {
+      qc.setQueryData(keys.prep(p.id), p);
+      qc.invalidateQueries({ queryKey: ['preps'] });
+    },
+  });
+}
+
+/** Saves one question's notes and confidence, and updates the cached plan (and its progress) in place. */
+export function useSavePrepAnswer(prepId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (v: { itemId: string; notes: string; confidence: Confidence }) =>
+      api.put<PrepItem>(`/api/interview-preps/${prepId}/items/${v.itemId}`, { notes: v.notes, confidence: v.confidence }).then((r) => r.data),
+    onSuccess: (item) => {
+      qc.setQueryData<InterviewPrep>(keys.prep(prepId), (old) => {
+        if (!old) return old;
+        const items = old.items.map((i) => (i.id === item.id ? item : i));
+        const practised = items.filter((i) => i.section !== 'ASK');
+        const ready = practised.filter((i) => i.confidence === 'READY').length;
+        const shaky = practised.filter((i) => i.confidence === 'SHAKY').length;
+        return { ...old, items, progress: { total: practised.length, ready, shaky, notStarted: practised.length - ready - shaky } };
+      });
+      qc.invalidateQueries({ queryKey: ['preps'] });
+    },
+  });
+}
+
+export function useDeletePrep() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/api/interview-preps/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['preps'] }),
+  });
+}
 
 // ---------- browser extension ----------
 export const useExtensionConnections = () =>

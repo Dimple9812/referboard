@@ -173,6 +173,24 @@ export interface CoverLetter {
   downloadPath: string;
 }
 
+// ---------- interview prep ----------
+export type PrepSection = 'EXPERIENCE' | 'TECHNICAL' | 'ROLE' | 'BEHAVIOURAL' | 'GAPS' | 'ASK';
+export type Confidence = 'NEW' | 'SHAKY' | 'READY';
+export interface PrepItem {
+  id: string; section: PrepSection; question: string; why: string; pointers: string[];
+  example?: { company?: string | null; title?: string | null; text: string } | null; skill?: string | null;
+  source: 'BANK' | 'RESUME' | 'POSTING' | 'AI'; notes?: string | null; confidence: Confidence; updatedAt?: string | null;
+}
+export interface PrepProgress { total: number; ready: number; shaky: number; notStarted: number }
+export interface InterviewPrep {
+  id: string; analysisId?: string | null; jobId?: string | null; jobTitle?: string | null; companyName?: string | null;
+  createdAt: string; aiQuestions: boolean; progress: PrepProgress; items: PrepItem[]; notices?: string[] | null; existing: boolean;
+}
+export interface PrepSummary {
+  id: string; analysisId?: string | null; jobId?: string | null; jobTitle?: string | null; companyName?: string | null;
+  createdAt: string; progress: PrepProgress;
+}
+
 // ---------- extension ----------
 export interface ExtensionConnection { id: string; connectedAt: string; lastUsedAt: string; browser: string }
 export interface ExtensionTokens {

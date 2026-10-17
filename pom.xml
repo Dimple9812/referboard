@@ -34,6 +34,8 @@
         <module>services/resume-analyzer-service</module>
         <module>services/tracker-service</module>
         <module>services/notification-service</module>
+        <module>services/billing-service</module>
+        <module>services/interview-service</module>
     </modules>
 
     <properties>

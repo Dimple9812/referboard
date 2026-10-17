@@ -41,7 +41,7 @@ public class CoverLetterController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Write a cover letter for the job in this analysis")
     public LetterResponse create(@PathVariable UUID analysisId, @Valid @RequestBody(required = false) CreateLetterRequest req) {
-        return letters.create(CurrentUser.id(), analysisId, req == null ? new CreateLetterRequest(null, null) : req);
+        return letters.create(CurrentUser.id(), Roles.unlimited(), analysisId, req == null ? new CreateLetterRequest(null, null) : req);
     }
 
     @GetMapping("/api/cover-letters")

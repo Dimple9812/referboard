@@ -1,0 +1,205 @@
+# Interview question bank used when no LLM is configured (and as a floor when one is).
+# Keys under `skills` are canonical skill names from platform/skills (lowercase). Each question says what the
+# interviewer is usually checking, so the candidate can prepare the point rather than memorise an answer.
+# A skill not listed here gets the generic `any-skill` questions with its name filled in.
+skills:
+  java:
+    - q: How does a HashMap work internally, and what changed in Java 8 for buckets with many collisions?
+      checks: Data-structure fundamentals, hashing, equals/hashCode contracts, treeification.
+    - q: Explain the difference between checked and unchecked exceptions. When would you create your own?
+      checks: API design judgement and error handling habits.
+    - q: What happens when two threads update the same object without synchronisation? How would you fix it?
+      checks: Concurrency basics, visibility, atomicity, and knowing java.util.concurrent.
+  spring boot:
+    - q: What does Spring Boot auto-configuration do, and how would you find out why a bean was or wasn't created?
+      checks: Understanding beyond annotations; debugging with the conditions report.
+    - q: How do transactions work with @Transactional? What happens when one @Transactional method calls another in the same class?
+      checks: Proxies, propagation, the self-invocation pitfall.
+    - q: How would you structure configuration for different environments without putting secrets in the code?
+      checks: Profiles, externalised configuration, secret handling.
+  spring:
+    - q: What is dependency injection, and why does Spring prefer constructor injection?
+      checks: Design fundamentals and testability.
+  hibernate:
+    - q: What is the N+1 query problem and how do you detect and fix it?
+      checks: ORM performance awareness, fetch strategies, reading SQL logs.
+    - q: When would you skip JPA and write SQL directly?
+      checks: Pragmatism about abstractions.
+  microservices:
+    - q: How do you keep data consistent across services without distributed transactions?
+      checks: Sagas, outbox, idempotency, eventual consistency trade-offs.
+    - q: When would you not split a system into microservices?
+      checks: Judgement; cost of distribution versus team and domain boundaries.
+    - q: A downstream service is slow and starts timing out. What protects your service?
+      checks: Timeouts, retries with backoff, circuit breakers, bulkheads, graceful degradation.
+  rest api:
+    - q: How would you design pagination, filtering and errors for a public REST API?
+      checks: API design consistency, cursor vs offset, error shapes, versioning.
+    - q: What makes an endpoint idempotent, and why does it matter for payments?
+      checks: Safe retries, idempotency keys.
+  grpc:
+    - q: When would you choose gRPC over REST, and what does it cost you?
+      checks: Protocol trade-offs, schemas, browser support, tooling.
+  kafka:
+    - q: How does Kafka guarantee ordering, and what breaks it?
+      checks: Partitions, keys, consumer groups, rebalancing.
+    - q: How do you avoid processing a message twice?
+      checks: At-least-once delivery, idempotent consumers, transactional outbox.
+    - q: A consumer keeps failing on one bad message. What do you do?
+      checks: Retries with backoff, dead-letter topics, poison-pill handling.
+  rabbitmq:
+    - q: Compare RabbitMQ and Kafka. Which would you pick for a job queue, and why?
+      checks: Messaging models and fitness for purpose.
+  postgresql:
+    - q: A query got slow after the table grew. How do you find out why?
+      checks: EXPLAIN ANALYZE, indexes, statistics, query shape.
+    - q: Explain transaction isolation levels and an anomaly each one prevents.
+      checks: Concurrency correctness in databases.
+    - q: How would you add a column to a large, busy table without downtime?
+      checks: Safe migrations, locks, backfills.
+  mysql:
+    - q: How do indexes work in InnoDB, and when does a composite index not help?
+      checks: B-tree indexes, leftmost prefix, covering indexes.
+  sql:
+    - q: Write a query for the top three earners in each department. How would you check it's correct?
+      checks: Window functions or joins, and testing your own SQL.
+  mongodb:
+    - q: How do you model a one-to-many relationship in MongoDB, and when would you embed versus reference?
+      checks: Document modelling trade-offs.
+  redis:
+    - q: How would you use Redis as a cache, and how do you keep it from serving stale data?
+      checks: Cache-aside, TTLs, invalidation, stampedes.
+    - q: How would you build a rate limiter with Redis?
+      checks: Atomic operations, token bucket or sliding window, Lua scripts.
+  elasticsearch:
+    - q: How does Elasticsearch rank results, and how would you tune relevance?
+      checks: Inverted index, scoring, analysers.
+  caching:
+    - q: What are the hard parts of caching, and how have you handled invalidation?
+      checks: Consistency trade-offs and practical experience.
+  docker:
+    - q: How would you make a Docker image for a Java service small and secure?
+      checks: Multi-stage builds, base images, non-root users, layers.
+  kubernetes:
+    - q: What happens, step by step, when you deploy a new version of a service to Kubernetes?
+      checks: Deployments, rolling updates, readiness probes.
+    - q: A pod keeps restarting. How do you investigate?
+      checks: kubectl describe/logs, probes, resource limits, OOMKilled.
+  aws:
+    - q: Design a simple, reliable setup on AWS for a web API with a database. What would you use and why?
+      checks: Core services, availability zones, managed services, cost awareness.
+  terraform:
+    - q: How do you manage Terraform state safely in a team?
+      checks: Remote state, locking, modules, plan reviews.
+  ci/cd:
+    - q: Walk me through a good CI/CD pipeline for a backend service.
+      checks: Tests, quality gates, artifact promotion, safe rollouts and rollback.
+  github actions:
+    - q: How would you speed up a slow GitHub Actions pipeline?
+      checks: Caching, parallel jobs, splitting tests.
+  linux:
+    - q: A server is slow. Which commands do you reach for first, and what are you looking for?
+      checks: "Practical debugging: top, free, df, iostat, logs."
+  git:
+    - q: How do you keep a long-running branch in sync, and how do you recover from a bad merge?
+      checks: Rebase vs merge, revert vs reset, team habits.
+  junit:
+    - q: What makes a unit test good, and when do you need an integration test instead?
+      checks: Test design, isolation, the test pyramid.
+  unit testing:
+    - q: How do you test code that depends on time, randomness or a remote API?
+      checks: Seams, clocks, fakes and mocks.
+  testcontainers:
+    - q: Why test against a real database in a container rather than an in-memory one?
+      checks: Fidelity of tests versus speed.
+  react:
+    - q: When does a React component re-render, and how do you stop unnecessary re-renders?
+      checks: State, props, memoisation, profiling.
+    - q: How do you manage server data (loading, caching, errors) in a React app?
+      checks: Data-fetching patterns, libraries like TanStack Query, error and loading states.
+  typescript:
+    - q: How do you type an API response you don't fully trust?
+      checks: Runtime validation versus compile-time types, unknown vs any.
+  javascript:
+    - q: Explain the event loop, and what happens with a long synchronous loop in the browser.
+      checks: Concurrency model, microtasks vs tasks, responsiveness.
+  node.js:
+    - q: How do you handle CPU-heavy work in a Node.js service?
+      checks: Event loop blocking, worker threads, offloading.
+  python:
+    - q: What's the GIL, and when does it matter?
+      checks: Concurrency in Python, threads vs processes vs async.
+  go:
+    - q: How do goroutines and channels differ from threads and queues?
+      checks: Go's concurrency model, leaks, context cancellation.
+  system design:
+    - q: Design a URL shortener that handles 10,000 writes a second. Start with the requirements.
+      checks: Clarifying requirements, capacity estimates, data model, scaling, trade-offs.
+    - q: Design a notification system that sends email and in-app messages reliably.
+      checks: Queues, retries, idempotency, user preferences, rate limits.
+  data structures:
+    - q: When would you use a heap, and what's the time complexity of its operations?
+      checks: Fundamentals and reasoning about complexity.
+  multithreading:
+    - q: What's a deadlock, and how do you prevent one?
+      checks: Lock ordering, timeouts, avoiding shared state.
+  event-driven architecture:
+    - q: What changes when a system moves from synchronous calls to events?
+      checks: Coupling, consistency, ordering, observability.
+  application security:
+    - q: How do you protect an API from the common OWASP issues?
+      checks: Authentication, authorisation checks per resource, injection, rate limits.
+  oauth2:
+    - q: Explain the OAuth 2 authorisation code flow with PKCE. Why does PKCE exist?
+      checks: Auth fundamentals and threat awareness.
+  jwt:
+    - q: Where should a web app keep its tokens, and how do refresh tokens work safely?
+      checks: XSS/CSRF trade-offs, rotation, revocation.
+  machine learning:
+    - q: Your model does well offline but poorly in production. What could be wrong?
+      checks: Data drift, leakage, evaluation design.
+  llm:
+    - q: How would you stop an LLM feature from making things up?
+      checks: Grounding, retrieval, output validation, evaluation.
+  agile:
+    - q: How do you handle a sprint where the scope keeps changing?
+      checks: Communication, prioritisation, protecting focus.
+  any-skill:
+    - q: Tell me about something you built with {skill}. What would you do differently now?
+      checks: Depth of real experience and reflection.
+    - q: What's a common mistake people make with {skill}, and how do you avoid it?
+      checks: Practical, hands-on knowledge.
+
+# Behavioural questions. `keywords` pick the resume bullet that best fits as the candidate's example.
+behavioural:
+  - q: Tell me about a project you're proud of. What was your part?
+    checks: Ownership, impact, and whether you can explain your own contribution clearly.
+    keywords: [built, designed, launched, shipped, owned, created, developed, migrated]
+  - q: Tell me about a time something you built broke in production.
+    checks: Calm debugging, honesty, and what you changed afterwards.
+    keywords: [incident, outage, latency, reliability, fixed, reduced, debug, on-call, monitoring]
+  - q: Tell me about a time you made something faster or cheaper.
+    checks: Measurement before and after, and the trade-offs you weighed.
+    keywords: [reduced, cut, improved, optimised, optimized, faster, latency, cost, throughput, "%"]
+  - q: Tell me about a time you disagreed with a technical decision.
+    checks: Respectful disagreement, data over opinion, committing once decided.
+    keywords: [design review, proposed, decision, architecture, migrated, replaced]
+  - q: Tell me about a time you helped someone else get better.
+    checks: Mentoring, sharing knowledge, raising the team's level.
+    keywords: [mentored, coached, onboarded, trained, reviews, led, guided]
+  - q: Tell me about a deadline you nearly missed. What did you do?
+    checks: Prioritisation, communication, cutting scope sensibly.
+    keywords: [launched, delivered, deadline, release, shipped]
+
+# Good questions to ask the interviewer. `when` limits some to senior roles.
+asks:
+  - q: What would a great first 90 days look like in this role?
+  - q: What's the hardest problem the team is working on right now?
+  - q: How does the team decide what to build next, and who's involved?
+  - q: How do code reviews and releases work here? How often do you deploy?
+  - q: What happens when something breaks in production? Who's on call?
+  - q: How do people grow here, and what does the next level look like?
+  - q: What would you change about how the team works, if you could?
+    when: senior
+  - q: How much of my time would go to design and mentoring versus writing code?
+    when: senior

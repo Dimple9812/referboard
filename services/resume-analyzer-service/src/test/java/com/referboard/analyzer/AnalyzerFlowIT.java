@@ -145,6 +145,14 @@ class AnalyzerFlowIT {
                                     List.of(Map.of("type", "text", "text", letterReply.get())),
                                     "usage", Map.of("input_tokens", 1, "output_tokens", 1))));
                         }
+                        if (body.contains("record_interview_questions")) {
+                            return json(toolUse("record_interview_questions", Map.of("questions", List.of(
+                                    Map.of("question", "How would you make settlement processing safe to retry after a crash?",
+                                            "why", "Payments work needs exactly-once effects.",
+                                            "pointers", List.of("Idempotency keys", "Outbox", "Reconciliation")),
+                                    Map.of("question", "How would you scale this to 50 million users?",
+                                            "why", "Invented scale.", "pointers", List.of())))));
+                        }
                         if (body.contains("record_job_requirements")) {
                             jdParseCalls.incrementAndGet();
                             return json(toolUse("record_job_requirements", jdParse()));
@@ -236,6 +244,11 @@ class AnalyzerFlowIT {
         assertThat(again.get("id").asText()).isEqualTo(ids.get("analysis"));
         assertThat(jdParseCalls.get()).isEqualTo(parsesBefore);
         assertThat(json(get("/api/analyses/usage", TOKEN), 200).get("used").asInt()).isEqualTo(1);
+        // One AnalysisCompleted for the new analysis (scores only); none for the reused one.
+        assertThat(jdbc.queryForObject("select count(*) from outbox_events where event_type = 'AnalysisCompleted'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select payload::text from outbox_events where event_type = 'AnalysisCompleted'",
+                String.class)).contains("\"score\": " + score).doesNotContain("Spring Boot services");
     }
 
     @Test
@@ -415,8 +428,78 @@ class AnalyzerFlowIT {
 
     @Test
     @Order(8)
-    void isolationAndAuth() {
+    void interviewPrepFromAnAnalysisWithPractice() throws Exception {
+        String path = "/api/analyses/" + ids.get("analysis") + "/interview-prep";
+        ResponseEntity<String> created = post(path, null, TOKEN);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        JsonNode prep = mapper.readTree(created.getBody());
+        String id = prep.get("id").asText();
+        List<JsonNode> items = list(prep.get("items"));
+        assertThat(items.stream().map(i -> i.get("section").asText()).distinct().toList())
+                .containsExactly("EXPERIENCE", "TECHNICAL", "ROLE", "BEHAVIOURAL", "GAPS", "ASK");
+        assertThat(items).anySatisfy(i -> {
+            assertThat(i.get("section").asText()).isEqualTo("EXPERIENCE");
+            assertThat(i.at("/example/company").asText()).isEqualTo("Lumen Pay");
+            assertThat(i.get("question").asText()).startsWith("Your resume says: “");
+        });
+        assertThat(items).anyMatch(i -> i.get("question").asText().equals("Have you worked with gRPC?"));
+        // The AI question that invented a scale was dropped; the good one sits with the role questions.
+        assertThat(items).filteredOn(i -> i.get("source").asText().equals("AI")).extracting(i -> i.get("question").asText())
+                .containsExactly("How would you make settlement processing safe to retry after a crash?");
+        assertThat(prep.get("aiQuestions").asBoolean()).isTrue();
+        int total = prep.at("/progress/total").asInt();
+        assertThat(total).isEqualTo((int) items.stream().filter(i -> !i.get("section").asText().equals("ASK")).count());
+        assertThat(prep.at("/progress/notStarted").asInt()).isEqualTo(total);
+
+        // Asking again returns the same plan.
+        ResponseEntity<String> again = post(path, null, TOKEN);
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(mapper.readTree(again.getBody()).get("id").asText()).isEqualTo(id);
+
+        // Practice notes and confidence, kept with the plan.
+        String first = items.getFirst().get("id").asText();
+        HttpHeaders h = headers(TOKEN);
+        h.setContentType(MediaType.APPLICATION_JSON);
+        JsonNode saved = json(rest.exchange("/api/interview-preps/" + id + "/items/" + first, HttpMethod.PUT,
+                new HttpEntity<>(Map.of("notes", "Measured with the payouts dashboard, p99 from 900 ms to 540 ms",
+                        "confidence", "READY"), h), String.class), 200);
+        assertThat(saved.get("confidence").asText()).isEqualTo("READY");
+        JsonNode reread = json(get("/api/interview-preps/" + id, TOKEN), 200);
+        assertThat(reread.at("/progress/ready").asInt()).isEqualTo(1);
+        assertThat(reread.at("/items/0/notes").asText()).contains("900 ms");
+        assertThat(rest.exchange("/api/interview-preps/" + id + "/items/nope", HttpMethod.PUT,
+                new HttpEntity<>(Map.of("confidence", "READY"), h), String.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(rest.exchange("/api/interview-preps/" + id + "/items/" + first, HttpMethod.PUT,
+                new HttpEntity<>(Map.of("notes", "x"), h), String.class).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        JsonNode summaries = json(get("/api/interview-preps", TOKEN), 200);
+        assertThat(summaries).hasSize(1);
+        assertThat(summaries.get(0).at("/progress/ready").asInt()).isEqualTo(1);
         String other = TestJwt.tokenFor(UUID.randomUUID());
+        assertThat(get("/api/interview-preps/" + id, other).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+        // Without the model the plan still works; deleting removes it and its notes.
+        assertThat(rest.exchange("/api/interview-preps/" + id, HttpMethod.DELETE, new HttpEntity<>(headers(TOKEN)),
+                String.class).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        llmDown.set(true);
+        JsonNode offline = json(post(path, null, TOKEN), 201);
+        llmDown.set(false);
+        assertThat(offline.get("aiQuestions").asBoolean()).isFalse();
+        assertThat(offline.get("notices").toString()).contains("unavailable right now");
+        assertThat(offline.at("/progress/ready").asInt()).isZero();
+    }
+
+    @Test
+    @Order(9)
+    void isolationAndAuth() throws Exception {
+        String other = TestJwt.tokenFor(UUID.randomUUID());
+        JsonNode ctx = json(get("/api/analyses/" + ids.get("analysis") + "/context", TOKEN), 200);
+        assertThat(ctx.at("/resume/fullName").asText()).isEqualTo("Asha Rao");
+        assertThat(ctx.at("/resume/experiences/0/bullets/0").asText()).startsWith("Built Spring Boot services");
+        assertThat(ctx.at("/parsedJd/requiredSkills").toString()).contains("grpc");
+        assertThat(ctx.get("yearsOfExperience").asText()).isNotBlank();
+        assertThat(get("/api/analyses/" + ids.get("analysis") + "/context", other).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(get("/api/analyses/" + ids.get("analysis"), other).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(get("/api/resume-versions/" + ids.get("version"), other).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(get("/api/analyses", null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);

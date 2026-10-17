@@ -67,6 +67,11 @@ public class User {
 
     private Instant lockedUntil;
 
+    /** End of a paid Pro pass (billing-service); null if never bought. */
+    private Instant proUntil;
+
+    private Instant proChangedAt;
+
     private Instant lastLoginAt;
 
     @CreationTimestamp
@@ -134,5 +139,27 @@ public class User {
         if (this.avatarUrl == null) {
             this.avatarUrl = avatar;
         }
+    }
+
+    public boolean hasPro(Instant now) {
+        return role == Role.PRO || role == Role.ADMIN || (proUntil != null && proUntil.isAfter(now));
+    }
+
+    /** Roles for the access token: the stored role, plus PRO while a paid pass runs. */
+    public java.util.List<String> effectiveRoles(Instant now) {
+        if (role == Role.USER && proUntil != null && proUntil.isAfter(now)) {
+            return java.util.List.of(Role.USER.name(), Role.PRO.name());
+        }
+        return java.util.List.of(role.name());
+    }
+
+    /** Applies a pass change unless a newer one was already applied. Returns false when it's stale. */
+    public boolean applyProChange(Instant until, Instant changedAt) {
+        if (proChangedAt != null && changedAt != null && changedAt.isBefore(proChangedAt)) {
+            return false;
+        }
+        this.proUntil = until;
+        this.proChangedAt = changedAt;
+        return true;
     }
 }

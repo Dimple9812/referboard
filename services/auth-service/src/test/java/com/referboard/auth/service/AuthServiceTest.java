@@ -63,7 +63,7 @@ class AuthServiceTest {
         when(mapper.toResponse(any())).thenAnswer(inv -> {
             User u = inv.getArgument(0);
             return new UserResponse(u.getId(), u.getEmail(), u.getFullName(), null, u.getAuthProvider().name(),
-                    u.isEmailVerified(), u.getRole().name(), null);
+                    u.isEmailVerified(), u.getRole().name(), null, "FREE", null);
         });
         when(refreshTokens.startFamily(any(), any())).thenAnswer(inv -> new RefreshTokenService.Issued("raw-refresh",
                 RefreshToken.issue(inv.getArgument(0), "h", UUID.randomUUID(), NOW.plusSeconds(60), null, null)));

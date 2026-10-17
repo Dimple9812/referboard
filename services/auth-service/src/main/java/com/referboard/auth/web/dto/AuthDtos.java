@@ -61,7 +61,10 @@ public final class AuthDtos {
             String authProvider,
             boolean emailVerified,
             String role,
-            Instant createdAt
+            Instant createdAt,
+            @io.swagger.v3.oas.annotations.media.Schema(description = "PRO while a paid pass runs (or for PRO/ADMIN roles), else FREE")
+            String plan,
+            Instant proUntil
     ) {
     }
 

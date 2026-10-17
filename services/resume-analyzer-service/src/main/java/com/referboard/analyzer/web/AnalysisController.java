@@ -107,6 +107,12 @@ public class AnalysisController {
         return analyses.usage(CurrentUser.id(), Roles.unlimited());
     }
 
+    @GetMapping("/{id}/context")
+    @Operation(summary = "The posting, skill matches and resume content behind an analysis (used by interview prep)")
+    public com.referboard.analyzer.web.dto.AnalyzerDtos.AnalysisContext context(@PathVariable UUID id) {
+        return analyses.context(CurrentUser.id(), id);
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "A stored analysis report")
     public AnalysisReport get(@PathVariable UUID id) {

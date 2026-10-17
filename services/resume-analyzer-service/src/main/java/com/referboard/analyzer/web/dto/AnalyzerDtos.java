@@ -116,4 +116,16 @@ public final class AnalyzerDtos {
             @Schema(description = "Structured content; only on the detail endpoint")
             com.referboard.analyzer.model.ResumeContent content) {
     }
+
+    @Schema(description = "What an analysis compared, for interview prep: the parsed posting, the skill matches and the "
+            + "resume content used. The caller's own data only.")
+    public record AnalysisContext(
+            UUID analysisId,
+            JobRef job,
+            ParsedJd parsedJd,
+            List<MatchReport.SkillMatch> matchedSkills,
+            MatchReport.MissingSkills missingSkills,
+            String yearsOfExperience,
+            com.referboard.analyzer.model.ResumeContent resume) {
+    }
 }

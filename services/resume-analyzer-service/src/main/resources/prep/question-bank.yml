@@ -1,0 +1,315 @@
+# Interview question bank used by the prep planner.
+# skills: canonical skill name (as in skills.yml) → questions. categories: fallback for skills without their own.
+# Each question has `why` (what the interviewer is checking) and `covers` (points a strong answer touches).
+# Keep questions real and answerable in 3–5 minutes; no trivia.
+
+skills:
+  java:
+    - q: How does a HashMap work internally, and what changed in Java 8 for buckets with many collisions?
+      why: Checks you understand the data structure you use every day, not just its API.
+      covers: [hashCode and equals contract, buckets and load factor, resize cost, treeified buckets after 8 collisions, why mutable keys break lookups]
+    - q: What happens in the JVM when an object is no longer referenced? How would you investigate a memory leak?
+      why: Tests garbage collection basics and how you debug production issues.
+      covers: [generational heap, GC roots, heap dumps and a profiler, common leaks (static maps, listeners, ThreadLocal), GC logs]
+  spring boot:
+    - q: What does auto-configuration do in Spring Boot, and how would you find out why a bean was or wasn't created?
+      why: Shows whether you understand the framework or only follow tutorials.
+      covers: [conditional annotations, starters, the conditions report (--debug or actuator), overriding with your own bean]
+    - q: How do transactions work with @Transactional, and when does it silently not apply?
+      why: Self-invocation and checked-exception rollback are classic production bugs.
+      covers: [proxy-based AOP, self-invocation bypass, rollback rules for checked exceptions, propagation, read-only transactions]
+  spring:
+    - q: Explain dependency injection in Spring and the difference between singleton and prototype scope.
+      why: Core framework understanding.
+      covers: [inversion of control, constructor injection, bean lifecycle, scopes and thread safety of singletons]
+  hibernate:
+    - q: What is the N+1 query problem in JPA, and how do you detect and fix it?
+      why: The most common ORM performance problem.
+      covers: [lazy associations, SQL logging or statistics, fetch joins, entity graphs, batch fetching, DTO projections]
+  microservices:
+    - q: How do you keep data consistent across two services when one call succeeds and the other fails?
+      why: Distributed transactions are where microservice designs break.
+      covers: [no two-phase commit, sagas, transactional outbox, idempotent consumers, compensating actions]
+    - q: When would you not split a system into microservices?
+      why: Tests judgement rather than enthusiasm.
+      covers: [team size and ownership, operational cost, network failures, data coupling, a modular monolith first]
+  rest api:
+    - q: How would you design a REST API for creating payments so that a retried request doesn't charge twice?
+      why: Idempotency is essential for anything involving money or side effects.
+      covers: [idempotency keys, safe vs idempotent methods, status codes, storing request results, timeouts and retries]
+  grpc:
+    - q: When would you pick gRPC over REST between services, and what do you give up?
+      why: Checks you can weigh protocols for a use case.
+      covers: [protobuf contracts, HTTP/2 streaming, code generation, browser support, debugging and tooling]
+  node.js:
+    - q: How does the Node.js event loop handle many concurrent requests on one thread, and what blocks it?
+      why: The core of Node performance.
+      covers: [event loop phases, non-blocking I/O, CPU-bound work blocking, worker threads, measuring event-loop lag]
+  python:
+    - q: What is the GIL, and how does it affect threads, async code and multiprocessing in Python?
+      why: Shows you can choose the right concurrency model.
+      covers: [one thread runs bytecode at a time, I/O-bound vs CPU-bound work, asyncio, multiprocessing, native extensions]
+  django:
+    - q: How does the Django ORM decide when to run a query, and how do select_related and prefetch_related differ?
+      why: Query count is the usual Django performance issue.
+      covers: [lazy querysets, joins vs separate queries, N+1, debug toolbar, indexes]
+  javascript:
+    - q: Explain closures and how `this` is decided in JavaScript, with an example where it surprises people.
+      why: Fundamentals behind most JS bugs.
+      covers: [lexical scope, function vs arrow functions, call/apply/bind, callbacks losing `this`]
+  typescript:
+    - q: How do you type an API response you don't fully trust, and what does `unknown` give you over `any`?
+      why: Checks practical type-safety habits.
+      covers: [unknown and narrowing, type guards, runtime validation (e.g. zod), generics, avoiding casts]
+  react:
+    - q: Why might a React component re-render too often, and how do you find and fix it?
+      why: Performance and understanding of the rendering model.
+      covers: [state and props changes, context updates, React DevTools profiler, memoisation trade-offs, keys in lists]
+    - q: Where would you keep server data versus UI state in a React app, and why?
+      why: Architecture judgement in front-end apps.
+      covers: [server cache (e.g. TanStack Query), local state, URL state, avoiding duplicated sources of truth]
+  next.js:
+    - q: When would you render a page on the server, statically or on the client in Next.js?
+      why: Rendering strategy affects speed, cost and SEO.
+      covers: [SSR, static generation and revalidation, client components, caching, data freshness]
+  angular:
+    - q: How does change detection work in Angular, and when would you use OnPush?
+      why: Core Angular performance knowledge.
+      covers: [zones, default vs OnPush, immutable inputs, observables and the async pipe, signals]
+  postgresql:
+    - q: A query that was fast is now slow on a big table. How do you investigate it?
+      why: Day-to-day database skill.
+      covers: [EXPLAIN ANALYZE, sequential vs index scans, missing or unused indexes, statistics and VACUUM, query shape]
+    - q: What isolation level does PostgreSQL use by default, and what anomalies can still happen?
+      why: Correctness under concurrency.
+      covers: [read committed, lost updates, SELECT ... FOR UPDATE, optimistic locking, serializable and retries]
+  mysql:
+    - q: How do indexes work in InnoDB, and why does column order matter in a composite index?
+      why: Indexing is the main performance lever.
+      covers: [B-trees, clustered primary key, leftmost prefix rule, covering indexes, cardinality]
+  mongodb:
+    - q: How would you model one-to-many data in MongoDB, and when would you embed versus reference?
+      why: Schema design is still needed in document databases.
+      covers: [access patterns, document size limit, embedding for reads together, references for unbounded growth, indexes]
+  redis:
+    - q: How would you use Redis as a cache in front of a database, and how do you keep it from serving stale data?
+      why: Caching correctness is harder than caching.
+      covers: [cache-aside, TTLs, invalidation on writes, stampede protection, eviction policies]
+  elasticsearch:
+    - q: How does Elasticsearch rank results, and how would you make search typo-tolerant?
+      why: Search relevance basics.
+      covers: [inverted index, analyzers, BM25, fuzzy queries, boosting fields]
+  kafka:
+    - q: How does Kafka guarantee message ordering, and what can break it?
+      why: Ordering assumptions cause subtle bugs.
+      covers: [ordering per partition only, keys choose partitions, retries with multiple in-flight requests, idempotent producers, consumer concurrency]
+    - q: How do you make a Kafka consumer safe to receive the same message twice?
+      why: At-least-once delivery is the norm.
+      covers: [offset commits after processing, idempotency keys or a processed-events table, dead-letter topics, rebalances]
+  rabbitmq:
+    - q: How do acknowledgements and prefetch work in RabbitMQ, and what happens to unacked messages?
+      why: Reliable delivery basics.
+      covers: [manual acks, prefetch count, redelivery, dead-letter exchanges, poison messages]
+  aws:
+    - q: How would you deploy a web service on AWS so it survives an availability zone going down?
+      why: Basic cloud architecture for reliability.
+      covers: [multiple AZs, load balancer, auto scaling, managed database with standby, health checks]
+  docker:
+    - q: What makes a Docker image small and fast to build, and how do layers affect that?
+      why: Practical container skill.
+      covers: [layer caching and instruction order, multi-stage builds, slim base images, .dockerignore, not running as root]
+  kubernetes:
+    - q: A pod keeps restarting. Walk me through how you'd find out why.
+      why: Everyday Kubernetes debugging.
+      covers: [kubectl describe and events, logs of the previous container, liveness vs readiness probes, OOMKilled and limits, config and secrets]
+  terraform:
+    - q: How do you manage Terraform state in a team, and what goes wrong without it?
+      why: State management is the main Terraform risk.
+      covers: [remote state, locking, plan before apply, drift, modules and environments]
+  ci/cd:
+    - q: What would a good pipeline from pull request to production look like for a service you own?
+      why: Delivery practices.
+      covers: [tests and checks on PRs, build once and promote, staged rollouts, automated rollback, secrets handling]
+  system design:
+    - q: Design a URL shortener that handles a lot of reads. What are the main components and bottlenecks?
+      why: Classic system design warm-up for many Indian product companies.
+      covers: [requirements and scale estimates, ID generation, storage choice, caching, analytics off the hot path]
+    - q: How would you design a notification system that sends email and push without duplicates?
+      why: Tests queues, retries and idempotency.
+      covers: [queue between producers and senders, retries with backoff, deduplication keys, user preferences, rate limits]
+  data structures:
+    - q: When would you use a heap, and how would you find the top 10 most frequent items in a stream?
+      why: Common DSA round question.
+      covers: [heap operations and complexity, hash map counts, min-heap of size k, trade-offs for very large streams]
+  multithreading:
+    - q: What is a race condition? Show one in code you've written or seen, and how you'd fix it.
+      why: Concurrency fundamentals.
+      covers: [shared mutable state, atomicity, locks vs atomic types, deadlock, thread-safe collections]
+  caching:
+    - q: Where would you add caching in a slow read-heavy API, and how would you measure that it helped?
+      why: Caching decisions should be measured.
+      covers: [hit rate, latency percentiles, invalidation, cache layers (CDN, app, DB), cold starts]
+  machine learning:
+    - q: Your model does well offline but poorly in production. What would you check?
+      why: Real ML work is mostly this.
+      covers: [training-serving skew, data drift, leakage in validation, feature pipelines, monitoring]
+  llm:
+    - q: How would you stop an LLM feature from making things up about a user's data?
+      why: Grounding and guardrails are central to LLM products.
+      covers: [retrieval with sources, constraining output schemas, validating outputs against facts, fallbacks, evaluation sets]
+  sql:
+    - q: Write a query to find each customer's latest order. How would you make it fast?
+      why: Window functions and indexing in one question.
+      covers: [ROW_NUMBER or DISTINCT ON, GROUP BY with a join, index on (customer, created_at), explain plans]
+  spark:
+    - q: What causes a shuffle in Spark, and how do you reduce its cost?
+      why: Shuffles dominate Spark job time.
+      covers: [wide vs narrow transformations, partitioning, broadcast joins, skew, caching]
+  airflow:
+    - q: How would you make an Airflow pipeline safe to re-run for a past date?
+      why: Idempotent, backfillable pipelines.
+      covers: [idempotent tasks, partitioned outputs, execution dates, retries, avoiding side effects]
+  junit:
+    - q: How do you decide what to unit test versus integration test in a service?
+      why: Testing strategy, not just syntax.
+      covers: [testing behaviour not implementation, test pyramid trade-offs, real databases in tests (e.g. Testcontainers), flaky tests]
+  application security:
+    - q: How would you protect a web app's login and session handling?
+      why: Security basics every engineer should know.
+      covers: [password hashing, rate limiting and lockout, secure httpOnly cookies, CSRF, token rotation]
+  oauth2:
+    - q: Explain the OAuth 2.0 authorization code flow with PKCE. Why not just use the implicit flow?
+      why: Common in auth-heavy roles.
+      covers: [redirect and code exchange, PKCE verifier, tokens never in the URL, refresh tokens, scopes]
+  android:
+    - q: How do you keep an Android app responsive while loading data, and survive rotation?
+      why: Core Android architecture.
+      covers: [main thread rules, coroutines, ViewModel and lifecycle, state restoration, caching]
+  flutter:
+    - q: How do you manage state in a Flutter app as it grows?
+      why: State management choices shape Flutter apps.
+      covers: [setState limits, Provider or Riverpod or Bloc, rebuild scope, separating UI and business logic]
+  product management:
+    - q: How would you decide what to build next when sales, support and engineering all want different things?
+      why: Prioritisation is the core of the job.
+      covers: [goals and metrics, impact vs effort, customer evidence, saying no, communicating trade-offs]
+  a/b testing:
+    - q: How would you set up an A/B test for a checkout change, and when would you stop it?
+      why: Experiment design and statistics.
+      covers: [hypothesis and primary metric, sample size and power, randomisation unit, not peeking, guardrail metrics]
+
+categories:
+  language:
+    - q: What do you like least about {skill}, and how do you work around it?
+      why: Shows depth of real use rather than tutorial knowledge.
+      covers: [a specific limitation, a concrete workaround, when you'd choose another language]
+  framework:
+    - q: How does {skill} handle a request from start to finish, and where would you hook in to add logging or auth?
+      why: Checks you understand the framework's lifecycle.
+      covers: [request lifecycle, middleware or filters, configuration, testing it]
+  architecture:
+    - q: Tell me about a time {skill} made a system better or worse. What would you change?
+      why: Architecture is judged by trade-offs.
+      covers: [the context, the trade-off, what you measured, what you'd do differently]
+  database:
+    - q: How have you designed a schema in {skill}, and how did indexes and queries shape it?
+      why: Data modelling skill.
+      covers: [access patterns, constraints, indexes, migrations, growth]
+  data:
+    - q: Walk me through a data pipeline you built with {skill}. How did you check the data was right?
+      why: Data quality is the hard part.
+      covers: [sources and outputs, validation checks, late or duplicate data, monitoring, re-runs]
+  messaging:
+    - q: How do you handle failures and duplicates when using {skill}?
+      why: Messaging systems fail in predictable ways.
+      covers: [retries, idempotency, dead letters, ordering, monitoring lag]
+  cloud:
+    - q: How would you keep cost and access under control for a service running on {skill}?
+      why: Cloud skills include cost and security, not just deployment.
+      covers: [least-privilege roles, budgets and alerts, right-sizing, managed vs self-run]
+  devops:
+    - q: Tell me about a deployment or infrastructure change with {skill} that went wrong. How did you recover?
+      why: Operational maturity.
+      covers: [detection, rollback, root cause, what you changed afterwards]
+  frontend:
+    - q: How do you keep a {skill} codebase fast and maintainable as it grows?
+      why: Front-end architecture.
+      covers: [component boundaries, state management, bundle size, accessibility, testing]
+  mobile:
+    - q: How do you handle poor connectivity and app updates in a {skill} app?
+      why: "Mobile realities in India: patchy networks and old devices."
+      covers: [offline caching, retries, backwards-compatible APIs, staged rollouts, crash monitoring]
+  testing:
+    - q: How do you use {skill} to catch real bugs without slowing the team down?
+      why: Testing judgement.
+      covers: [what to test, flaky tests, speed, running in CI]
+  observability:
+    - q: How would you use {skill} to find why one endpoint got slow last night?
+      why: Production debugging.
+      covers: [metrics vs logs vs traces, percentiles, correlation ids, alerts]
+  ml:
+    - q: Describe a model you built with {skill}. How did you evaluate it and decide it was good enough?
+      why: Evaluation discipline.
+      covers: [baseline, metric choice, validation split, error analysis, deployment]
+  security:
+    - q: What security mistakes have you seen with {skill}, and how do you prevent them?
+      why: Practical security awareness.
+      covers: [common pitfalls, defaults, reviews and tests]
+  fundamentals:
+    - q: Show how you've applied {skill} in a real project, not an exercise.
+      why: Connects fundamentals to real work.
+      covers: [the problem, the choice you made, the result]
+  tools:
+    - q: How do you use {skill} in your team's workflow, and what conventions do you follow?
+      why: Team practices.
+      covers: [conventions, automation, mistakes you've seen]
+  default:
+    - q: How have you used {skill}, and what would you do differently now?
+      why: Checks real experience.
+      covers: [context, your part, outcome, lessons]
+
+behavioural:
+  - q: Tell me about a project you're proud of. What was your part?
+    why: Almost always asked; they want ownership and clarity.
+    covers: [context in two sentences, your decisions, the result, what you learned]
+    levels: [ALL]
+  - q: Tell me about a time you disagreed with a teammate or manager. What happened?
+    why: Collaboration and handling conflict.
+    covers: [the disagreement, how you raised it, data you used, the outcome, the relationship afterwards]
+    levels: [ALL]
+  - q: Tell me about a production issue you handled. How did you find the cause?
+    why: Ownership under pressure.
+    covers: [impact, how you diagnosed it, the fix, what you changed so it doesn't recur]
+    levels: [ALL]
+  - q: Why are you looking to move, and why this role?
+    why: Asked in nearly every Indian tech interview; keep it positive and specific.
+    covers: [what you want to grow into, what this role offers, nothing negative about your current employer]
+    levels: [ALL]
+  - q: Tell me about something you learned quickly because a project needed it.
+    why: Learning speed matters most early in a career.
+    covers: [what you didn't know, how you learned, what you shipped]
+    levels: [INTERN, ENTRY, MID]
+  - q: Tell me about a time you mentored someone or raised the bar for your team.
+    why: Seniors are hired to multiply the team.
+    covers: [who and what, how you helped, the change you saw]
+    levels: [SENIOR, LEAD, PRINCIPAL]
+  - q: Tell me about a technical decision you drove that others initially resisted.
+    why: Influence without authority.
+    covers: [the decision, the objections, how you built agreement, the outcome]
+    levels: [SENIOR, LEAD, PRINCIPAL]
+  - q: How do you prioritise when you have more work than time?
+    why: Judgement and communication.
+    covers: [how you decide, who you tell, what you drop]
+    levels: [MID, SENIOR, LEAD, PRINCIPAL]
+
+questionsToAsk:
+  - q: What would success look like for this role in the first three to six months?
+    why: Shows you think about impact, and tells you what they actually need.
+  - q: How does the team decide what to build, and who is involved?
+    why: Tells you how much ownership you'd have.
+  - q: How are code reviews, on-call and releases done on this team?
+    why: Day-to-day reality of the job.
+  - q: What's the biggest challenge the team is facing right now?
+    why: Opens a real conversation; often reveals why the role exists.
+  - q: How is performance reviewed, and what does growth to the next level look like here?
+    why: Career path and fairness.

@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "questions": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "properties": {
+          "section": { "type": "string", "enum": ["TECHNICAL", "ROLE"] },
+          "question": { "type": "string", "description": "A question this interviewer is likely to ask, specific to this job." },
+          "checks": { "type": "string", "description": "What the interviewer is checking with it, in one sentence." },
+          "skill": { "type": "string", "description": "The skill it's about, if any, as the job names it." },
+          "experienceIndex": { "type": "integer", "description": "The candidate's best example: index into resume.experiences, or omit." },
+          "bulletIndex": { "type": "integer", "description": "Index into that experience's bullets, or omit." }
+        },
+        "required": ["section", "question", "checks"]
+      }
+    }
+  },
+  "required": ["questions"]
+}

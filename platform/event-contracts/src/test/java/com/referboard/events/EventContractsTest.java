@@ -55,4 +55,22 @@ class EventContractsTest {
         assertThat(event.reason()).isEqualTo(JobClosedEvent.REASON_UNSEEN_7_DAYS);
         assertThat(event.closedAt()).isEqualTo(Instant.parse("2026-10-13T00:00:00Z"));
     }
+
+    @Test
+    void phase3EventsRoundTripAndAreKeyedByUser() throws Exception {
+        UUID user = UUID.randomUUID();
+        ProStatusChangedEvent pro = new ProStatusChangedEvent(EventMetadata.of("ProStatusChanged", "billing-service", null),
+                user, "PURCHASE", "PRO_MONTH", Instant.parse("2026-11-15T00:00:00Z"), UUID.randomUUID(), 29900, "INR",
+                Instant.parse("2026-10-16T00:00:00Z"));
+        ProStatusChangedEvent back = mapper.readValue(mapper.writeValueAsString(pro), ProStatusChangedEvent.class);
+        assertThat(back).isEqualTo(pro);
+        assertThat(back.topic()).isEqualTo(Topics.PRO_STATUS_CHANGED);
+        assertThat(back.key()).isEqualTo(user.toString());
+
+        AnalysisCompletedEvent a = new AnalysisCompletedEvent(EventMetadata.of("AnalysisCompleted", "x", null), user,
+                UUID.randomUUID(), null, "PASTE", 72, "GOOD", Instant.now());
+        assertThat(mapper.readValue(mapper.writeValueAsString(a), AnalysisCompletedEvent.class)).isEqualTo(a);
+        assertThat(new InterviewPrepCreatedEvent(null, user, UUID.randomUUID(), null, 12, Instant.now()).topic())
+                .isEqualTo(Topics.INTERVIEW_PREP_CREATED);
+    }
 }

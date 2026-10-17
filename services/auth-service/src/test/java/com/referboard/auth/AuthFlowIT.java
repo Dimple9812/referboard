@@ -47,7 +47,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "referboard.auth.refresh-cookie.secure=false",
         "referboard.auth.jwt.key-dir=target/it-keys"
 })
-@EmbeddedKafka(partitions = 1, topics = Topics.USER_REGISTERED, kraft = true,
+@EmbeddedKafka(partitions = 1, topics = {Topics.USER_REGISTERED, Topics.PRO_STATUS_CHANGED}, kraft = true,
         bootstrapServersProperty = "spring.kafka.bootstrap-servers")
 class AuthFlowIT {
 
@@ -301,6 +301,60 @@ class AuthFlowIT {
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(post("/api/auth/extension/refresh", Map.of("refreshToken", many.getLast()), null).getStatusCode())
                 .isEqualTo(HttpStatus.OK);
+    }
+
+    @Autowired
+    org.springframework.kafka.core.KafkaTemplate<String, String> kafka;
+
+    @Test
+    void aPaidPassAddsProToTheNextTokenAndANewerChangeWins() throws Exception {
+        String email = "pro-" + UUID.randomUUID() + "@example.com";
+        ResponseEntity<String> signup = post("/api/auth/signup",
+                Map.of("email", email, "password", "Passw0rdOK", "fullName", "Asha Rao"), null);
+        JsonNode body = mapper.readTree(signup.getBody());
+        UUID userId = UUID.fromString(body.at("/user/id").asText());
+        String cookie = refreshCookie(signup);
+        assertThat(body.at("/user/plan").asText()).isEqualTo("FREE");
+        assertThat(roles(body.get("accessToken").asText())).containsExactly("USER");
+
+        java.time.Instant until = java.time.Instant.now().plus(Duration.ofDays(30));
+        java.time.Instant changedAt = java.time.Instant.now();
+        sendPro(userId, "PURCHASE", until, changedAt);
+        // An older event delivered late (a refund from before the purchase) must not undo it.
+        sendPro(userId, "REFUND", java.time.Instant.now().minusSeconds(60), changedAt.minusSeconds(3600));
+
+        long deadline = System.currentTimeMillis() + 15_000;
+        JsonNode refreshed = null;
+        while (System.currentTimeMillis() < deadline) {
+            ResponseEntity<String> r = post("/api/auth/refresh", null, cookie);
+            cookie = refreshCookie(r);
+            refreshed = mapper.readTree(r.getBody());
+            if ("PRO".equals(refreshed.at("/user/plan").asText())) {
+                break;
+            }
+            Thread.sleep(300);
+        }
+        assertThat(refreshed.at("/user/plan").asText()).isEqualTo("PRO");
+        assertThat(roles(refreshed.get("accessToken").asText())).containsExactly("USER", "PRO");
+        Thread.sleep(1500);   // give the stale event time to (not) apply
+        JsonNode me = mapper.readTree(get("/api/auth/me", refreshed.get("accessToken").asText()).getBody());
+        assertThat(me.get("plan").asText()).isEqualTo("PRO");
+        assertThat(java.time.Instant.parse(me.get("proUntil").asText())).isCloseTo(until,
+                org.assertj.core.api.Assertions.within(1, java.time.temporal.ChronoUnit.SECONDS));
+    }
+
+    private void sendPro(UUID userId, String reason, java.time.Instant until, java.time.Instant changedAt) throws Exception {
+        var event = new com.referboard.events.ProStatusChangedEvent(
+                com.referboard.events.EventMetadata.of("ProStatusChanged", "billing-service", null), userId, reason,
+                "PRO_MONTH", until, UUID.randomUUID(), 29900, "INR", changedAt);
+        kafka.send(Topics.PRO_STATUS_CHANGED, userId.toString(), mapper.writeValueAsString(event)).get();
+    }
+
+    private List<String> roles(String jwt) throws Exception {
+        String payload = new String(java.util.Base64.getUrlDecoder().decode(jwt.split("\\.")[1]));
+        List<String> out = new ArrayList<>();
+        mapper.readTree(payload).get("roles").forEach(n -> out.add(n.asText()));
+        return out;
     }
 
     private ResponseEntity<String> bearerPost(String path, String bearer) {

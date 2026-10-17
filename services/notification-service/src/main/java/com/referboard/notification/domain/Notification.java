@@ -27,7 +27,7 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Notification {
 
-    public enum Type { REFERRAL_REMINDER, DAILY_DIGEST, WELCOME, SYSTEM }
+    public enum Type { REFERRAL_REMINDER, DAILY_DIGEST, WELCOME, SYSTEM, BILLING, INTERVIEW }
 
     @Id
     private UUID id;

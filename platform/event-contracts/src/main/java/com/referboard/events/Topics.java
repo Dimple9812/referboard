@@ -40,6 +40,13 @@ public final class Topics {
     /** tracker-service → notification-service (and future analytics). Key: userId. */
     public static final String APPLICATION_STATUS_CHANGED = "application.status-changed.v1";
 
+    /** billing-service → auth-service (roles), notification-service (receipt), analytics-service. Key: userId. */
+    public static final String PRO_STATUS_CHANGED = "billing.pro-status-changed.v1";
+    /** resume-analyzer-service → analytics-service. Key: userId. */
+    public static final String ANALYSIS_COMPLETED = "analysis.completed.v1";
+    /** interview-service → analytics-service. Key: userId. */
+    public static final String INTERVIEW_PREP_CREATED = "interview.prep-created.v1";
+
     private Topics() {
     }
 }

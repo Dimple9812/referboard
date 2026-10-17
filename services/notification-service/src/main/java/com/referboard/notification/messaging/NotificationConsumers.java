@@ -105,4 +105,46 @@ public class NotificationConsumers {
                 EmailCategory.DIGEST, "daily-digest",
                 (firstName, unsubscribe) -> templates.digest(firstName, e, unsubscribe));
     }
+
+    private static final java.time.format.DateTimeFormatter DAY =
+            java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale.ENGLISH)
+                    .withZone(java.time.ZoneId.of("Asia/Kolkata"));
+
+    /** In-app confirmation only: Razorpay emails its own payment receipt. */
+    @KafkaListener(topics = Topics.PRO_STATUS_CHANGED, groupId = "notification-service")
+    @Transactional
+    public void onProStatusChanged(String payload) {
+        com.referboard.events.ProStatusChangedEvent e = json.read(payload, com.referboard.events.ProStatusChangedEvent.class);
+        if (!processed.markProcessed(e.metadata().eventId(), Topics.PRO_STATUS_CHANGED)) {
+            return;
+        }
+        boolean refund = "REFUND".equals(e.reason());
+        boolean stillPro = e.proUntil() != null && e.proUntil().isAfter(java.time.Instant.now());
+        String title = refund ? "Your refund was processed" : "Pro is on";
+        String body = refund
+                ? (stillPro ? "Pro now runs until " + DAY.format(e.proUntil()) + "." : "Your account is back on the free plan.")
+                : "Unlimited JD analyses and interview prep until " + DAY.format(e.proUntil()) + ". Thank you for supporting ReferBoard.";
+        writer.notify(new NewNotification(e.userId(), Notification.Type.BILLING, title, body, "/settings#billing",
+                Map.of("orderId", String.valueOf(e.orderId()), "reason", e.reason()),
+                "billing:" + e.orderId() + ":" + e.reason()), null, null, null);
+    }
+
+    /** When a tracker card reaches Interview, point the user at interview prep (once per application). */
+    @KafkaListener(topics = Topics.APPLICATION_STATUS_CHANGED, groupId = "notification-service")
+    @Transactional
+    public void onApplicationStatusChanged(String payload) {
+        com.referboard.events.ApplicationStatusChangedEvent e =
+                json.read(payload, com.referboard.events.ApplicationStatusChangedEvent.class);
+        if (!processed.markProcessed(e.metadata().eventId(), Topics.APPLICATION_STATUS_CHANGED)) {
+            return;
+        }
+        if (!"INTERVIEW".equals(e.newStage())) {
+            return;
+        }
+        writer.notify(new NewNotification(e.userId(), Notification.Type.INTERVIEW, "Get ready for your interview",
+                "Build a prep pack from the job description: likely questions, examples from your own resume to use, "
+                        + "and good questions to ask them.",
+                e.jobId() == null ? "/interview" : "/interview?jobId=" + e.jobId(),
+                Map.of("applicationId", e.applicationId().toString()), "interview:" + e.applicationId()), null, null, null);
+    }
 }
