@@ -60,6 +60,9 @@ referboard:
       analyzer: ${ANALYZER_SERVICE_URL:lb://resume-analyzer-service}
       tracker: ${TRACKER_SERVICE_URL:lb://tracker-service}
       notification: ${NOTIFICATION_SERVICE_URL:lb://notification-service}
+      billing: ${BILLING_SERVICE_URL:lb://billing-service}
+      interview: ${INTERVIEW_SERVICE_URL:lb://interview-service}
+      analytics: ${ANALYTICS_SERVICE_URL:lb://analytics-service}
 
 springdoc:
   api-docs:

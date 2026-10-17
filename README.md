@@ -12,13 +12,17 @@ flowchart LR
     SPA[React SPA] --> GW[api-gateway]
     EXT[Chrome extension] --> GW
     GW --> AUTH[auth] & PROF[profile] & JOB[job] & REF[referral] & ANA[resume-analyzer] & TRK[tracker] & NOT[notification]
+    GW --> BIL[billing] & INT[interview] & ANL[analytics]
+    RZP[Razorpay] -- webhooks --> GW
+    INT -- context --> ANA
     ING[ingestion] -- JobUpserted --> K{{Kafka}}
     PROF -- ProfileUpdated --> K
-    K --> JOB & TRK & NOT
-    AUTH & PROF & ING & JOB & REF & ANA & TRK & NOT --- PG[(Postgres + pgvector)]
+    BIL -- ProStatusChanged --> K
+    K --> JOB & TRK & NOT & AUTH & ANL
+    AUTH & PROF & ING & JOB & REF & ANA & TRK & NOT & BIL & INT & ANL --- PG[(Postgres + pgvector)]
 ```
 
-## Build status (Phases 1 and 2)
+## Build status (Phases 1, 2 and 3)
 
 | Module | Status | Tests |
 |---|---|---|
@@ -28,16 +32,19 @@ flowchart LR
 | skills | ✅ | 7 — aliases (K8s→Kubernetes), ambiguous words ("Go", "Excel"), extraction offsets |
 | ai-client | ✅ | 9 — Claude/OpenAI request shape, retries on 429/5xx/529, no retry on 4xx, embeddings |
 | discovery-server | ✅ | boots, health UP |
-| auth-service | ✅ | 16 unit + 9 integration (real Postgres, embedded Kafka; web and extension sessions) |
+| auth-service | ✅ | 16 unit + 10 integration (real Postgres, embedded Kafka; web and extension sessions; Pro role from billing events, stale ones ignored) |
 | profile-service | ✅ | 21 unit + 5 integration (real PDF/DOCX → parse → pgvector → Kafka; concurrent-onboarding race) |
 | ingestion-service | ✅ | 54 unit + 2 integration (4 simulated runs over 61 days against mock ATS APIs; force-republish) |
 | job-service | ✅ | 5 unit + 4 integration (events → FTS/trigram/pgvector search, Redis cache, matches, DLT, digest) |
 | referral-service | ✅ | 34 unit + 5 integration (Feign → mock job/profile/Claude APIs, draft guard, pipeline events, reminders on a movable clock) |
 | resume-analyzer-service | ✅ | 38 unit + 8 integration (LLM + heuristic paths, truth guard, tailored DOCX/PDF, cover letters and their guard, free-tier limit, JD cache) |
 | tracker-service | ✅ | 7 unit + 6 integration (board API, drag-and-drop ordering, referral/resume/closed-job events, create race) |
-| notification-service | ✅ | 5 unit + 6 integration (real SMTP via GreenMail: escaping, outage + retry, one-click unsubscribe, daily cap, dedup) |
+| notification-service | ✅ | 5 unit + 7 integration (real SMTP via GreenMail: escaping, outage + retry, one-click unsubscribe, daily cap, dedup; Pro and interview nudges) |
+| billing-service (Phase 3) | ✅ | 2 unit + 6 integration (Razorpay mocked over HTTP: real signatures, verify-once, capture of authorised payments, stacking passes, webhooks for abandoned checkouts, repeats and forgeries, refunds) |
+| interview-service (Phase 3) | ✅ | 8 unit + 4 integration (question bank, evidence only from resume bullets, AI questions with a bad index dropped, free-tier limit, practice with optimistic locking) |
+| analytics-service (Phase 3) | ✅ | 1 integration (all 7 topics, out of order and redelivered, IST weeks, minimum sample before a rate) |
 | api-gateway | ✅ | 5 unit + 9 integration (edge JWT via JWKS, CORS, Redis token buckets, fail-open, JSON errors, docs aggregation) |
-| frontend | ✅ | 13 unit (token refresh, board moves, formatting) + Playwright smoke on desktop and mobile against the live stack |
+| frontend | ✅ | 17 unit (token refresh, board moves, formatting, Razorpay checkout outcomes) + Playwright smoke and Phase 3 journeys (buy Pro, prep and practise, insights) on desktop and mobile against the live stack |
 | extension (Phase 2) | ✅ | 21 unit (site rules, page reading, session refresh, popup) + Playwright with the extension loaded in Chromium |
 
 ## Run locally with Docker
@@ -63,6 +70,9 @@ docker compose --profile tools up kafka-ui   # optional Kafka UI on :8090
 | http://localhost:8086/swagger-ui.html | resume-analyzer-service API docs (JD Match Analyzer, tailored resumes) |
 | http://localhost:8087/swagger-ui.html | tracker-service API docs (application board) |
 | http://localhost:8088/swagger-ui.html | notification-service API docs (inbox, email preferences) |
+| http://localhost:8089/swagger-ui.html | billing-service API docs (Pro passes, Razorpay) |
+| http://localhost:8091/swagger-ui.html | interview-service API docs (prep packs) |
+| http://localhost:8092/swagger-ui.html | analytics-service API docs (insights) |
 | http://localhost:8025 | Mailpit: every email the app sends locally |
 
 Try it:
@@ -120,6 +130,8 @@ npm run dev                   # Vite on :5173, proxying /api to GATEWAY_URL (def
 # End-to-end smoke test (sign up, onboard, jobs, analyzer, referrals, tracker, inbox, settings, reload, sign out)
 # against a running stack, on a desktop and a phone viewport. E2E_SCREENSHOTS=1 saves each screen to e2e-screens/.
 E2E_BASE_URL=http://localhost:3000 npx playwright test
+# The Phase 3 journey pays through a local stand-in for Razorpay (e2e/support/mock-razorpay.mjs on :9001):
+# start billing-service with RAZORPAY_API_BASE_URL=http://localhost:9001 and the test keys in that file.
 ```
 
 ## Run a service from your IDE
@@ -143,6 +155,9 @@ comments. The ones that matter today:
 | `KAFKA_BOOTSTRAP_SERVERS` | each service | |
 | `EUREKA_URL` | each service | |
 | `LOG_FORMAT` | each service | `ecs` for structured JSON logs; empty for plain text |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | billing-service | empty ⇒ Pro shows as unavailable and payment endpoints return 503 |
+| `PRO_MONTH_PRICE_PAISE`, `PRO_YEAR_PRICE_PAISE` | billing-service | prices of the 30- and 365-day passes |
+| `INTERVIEW_FREE_PACKS_PER_MONTH` | interview-service | default 3; Pro and ADMIN are unlimited |
 
 ## How the web app works
 
@@ -159,7 +174,8 @@ components (dialog/sheet, tabs), dnd-kit for the tracker board, sonner for toast
   resume, Find people to ask), JD Analyzer (job, pasted text or file; report with score breakdown, edits you
   approve one by one, ATS checks, tailored DOCX/PDF), Referral assistant (who to reach, LinkedIn search links,
   your contacts and drafts), Referrals CRM (status pipeline, due follow-ups), Tracker (drag-and-drop board),
-  Inbox, Settings (resumes, tailored resumes, job preferences, email, analyzer usage, sign out).
+  Inbox, Settings (resumes, tailored resumes, job preferences, email, analyzer usage, plan and payments, sign out),
+  and from Phase 3: Interview prep (packs and practice), Insights, ReferBoard Pro, and Admin (ADMIN only).
 - **Edits you approve:** only mechanical edits (skill order, the posting's spelling of a skill you have)
   start ticked. Anything that replaces your own sentences starts unticked. Anything that adds something new
   needs a separate "Add only if you have this experience" confirmation before the button enables.
@@ -170,7 +186,7 @@ components (dialog/sheet, tabs), dnd-kit for the tracker board, sonner for toast
   data. Respects reduced motion; visible keyboard focus; skip link; phone layout with a bottom tab bar.
 - **Serving:** `frontend/Dockerfile` builds the app and serves it with nginx (`frontend/docker/nginx.conf`):
   SPA fallback, year-long caching for hashed assets, `no-cache` for the shell, a strict CSP (self plus
-  Google's sign-in script), and `/api` proxied to the gateway on the same origin, so no CORS is involved.
+  Google's sign-in script and Razorpay Checkout), and `/api` proxied to the gateway on the same origin, so no CORS is involved.
   nginx overwrites `X-Forwarded-For` with the client address; the gateway trusts it
   (`TRUST_FORWARDED_FOR=true`) and is published on localhost only, so the header can't be spoofed from outside.
 
@@ -331,6 +347,72 @@ notification-service turns events into in-app notifications (`GET /api/notificat
 - `user.registered.v1` is a compacted topic with unlimited retention (declared by auth-service), so a newly
   deployed notification-service still learns every user's address by reading it from the beginning.
 
+## How Pro and payments work
+
+Pro is a **one-time pass**, 30 days (₹299) or 365 days (₹2,499), paid through Razorpay (UPI, cards, net banking,
+wallets). Nothing auto-renews, so there's no mandate to manage and nothing to cancel.
+
+| | Free | Pro |
+|---|---|---|
+| JD analyses | 5 a month | unlimited |
+| Interview prep packs | 3 a month | unlimited |
+| AI cover letters | 20 a day | 100 a day |
+| Everything else | included | included |
+
+1. `POST /api/billing/orders {plan}` creates a Razorpay order (amount set by the server, never the browser) and
+   returns what Checkout needs. At most 10 orders per user per hour.
+2. The browser opens Razorpay Checkout. On success, `POST /api/billing/orders/{id}/verify` checks the signature
+   (HMAC-SHA256 of `order_id|payment_id` with the key secret), fetches the payment from Razorpay, captures it if
+   only authorised, and marks the order paid.
+3. Razorpay's webhook (`POST /api/billing/webhooks/razorpay`; `payment.captured`, `order.paid`,
+   `payment.refunded`) does the same independently, so a closed tab never loses a payment. It checks
+   `X-Razorpay-Signature` over the raw body and ignores repeated `X-Razorpay-Event-Id`s.
+4. Paying extends Pro from whichever is later, now or the current end date. A full refund takes that order's days
+   back off; a partial refund changes nothing. Each change publishes `billing.pro-status-changed.v1`.
+5. auth-service stores `pro_until`. While it's in the future, new access tokens carry the `PRO` role, which the
+   analyzer and interview services check for their limits. The web app refreshes its token after paying.
+
+**Setting up Razorpay:** create test keys (`rzp_test_…`) in the Dashboard and set `RAZORPAY_KEY_ID` and
+`RAZORPAY_KEY_SECRET`. Under Webhooks, add `https://<your domain>/api/billing/webhooks/razorpay` with the three events
+above and a secret, and set the same value as `RAZORPAY_WEBHOOK_SECRET`. Switch to live keys only after Razorpay
+activates your account. Orders left unpaid for 2 hours are marked expired.
+
+## How interview prep works
+
+interview-service builds a prep pack from one JD analysis: it reads the posting and resume facts from the
+analyzer (`GET /api/analyses/{id}/context`, with the user's own token) and puts together:
+
+- **Opening:** an outline for "Tell me about yourself" from your current role, the skills the job wants that you
+  have, and the company.
+- **Technical questions** for the job's skills that your resume shows, from a curated bank
+  (`interview-service/src/main/resources/referboard/question-bank.yml`, 44 skills).
+- **The work itself:** one question per responsibility in the posting.
+- **Behavioural questions**, each paired with the resume bullet that makes the best example.
+- **Gaps to address honestly:** skills the posting asks for that your resume doesn't show, with advice to connect
+  them to what you have done rather than bluff.
+- **Questions to ask them**, with extra ones for senior roles.
+
+With an LLM configured, a few questions specific to the job are added. The model can only point at resume bullets
+by number; it can't write the evidence, so every example shown is a sentence you wrote. Questions referencing a
+bullet that doesn't exist are dropped. For each question you keep notes and mark it Not started, Practising or
+Confident. Moving a tracker card to Interview sends an inbox nudge linking to prep for that job.
+
+## How insights work
+
+analytics-service builds a read model from events (sign-ups, tracker stages, referral statuses, analyses,
+tailored resumes, prep packs, purchases) and serves `GET /api/insights`:
+
+- the application funnel by the furthest stage each job reached, and median days from applying to an interview;
+- **referred vs cold**: the share of each that reached an interview, shown only once a group has 5 applications;
+  below that a percentage is noise;
+- referral outreach by how far each conversation got;
+- the last 12 weeks (Monday to Sunday, IST) as small charts, also available as a table;
+- plain-language highlights that only state what the numbers show.
+
+Events can arrive late, twice or out of order; first-reached times only ever move earlier and the current stage only
+changes for a newer event. `GET /api/insights/admin` (ADMIN) shows platform totals: users, Pro now, paid
+conversion, revenue net of refunds, and weekly activity, with no personal data.
+
 ## Adding skills to the taxonomy
 
 Skill names are normalised everywhere (profiles, jobs, JD analysis) through
@@ -391,4 +473,6 @@ update auth.users set role = 'ADMIN' where email = 'you@example.com';
   in UTC, with layered jars.
 - Provide real JWT keys, distinct DB passwords per service role, and `LOG_FORMAT=ecs`.
 - Every service exposes `/actuator/health/liveness` and `/actuator/health/readiness` for orchestrator probes.
+- Configure live Razorpay keys and the webhook (see "How Pro and payments work"); the webhook path is public at the
+  gateway and authenticated by its signature.
 - Postgres needs the `vector` and `pg_trgm` extensions (`docker/postgres/init.sql` shows the bootstrap).

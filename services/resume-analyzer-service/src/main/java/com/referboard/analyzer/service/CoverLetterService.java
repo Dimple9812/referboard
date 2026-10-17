@@ -77,7 +77,8 @@ public class CoverLetterService {
         this.clock = clock;
     }
 
-    public LetterResponse create(UUID userId, UUID analysisId, CreateLetterRequest req) {
+    public LetterResponse create(UUID userId, boolean pro, UUID analysisId, CreateLetterRequest req) {
+        int aiCap = pro ? props.aiLettersPerDay() * 5 : props.aiLettersPerDay();
         JdAnalysis analysis = analyses.find(userId, analysisId);
         AnalysisReport report = analyses.read(analysis);
         ResumeContent resume = contentJson.read(analysis.getResumeContent());
@@ -96,8 +97,8 @@ public class CoverLetterService {
         String model = null;
         if (!ai.available()) {
             notices.add("AI drafting isn't configured, so this letter is built only from your resume and the posting.");
-        } else if (letters.countAiSince(userId, clock.instant().minus(1, ChronoUnit.DAYS)) >= props.aiLettersPerDay()) {
-            notices.add("You've used today's " + props.aiLettersPerDay()
+        } else if (letters.countAiSince(userId, clock.instant().minus(1, ChronoUnit.DAYS)) >= aiCap) {
+            notices.add("You've used today's " + aiCap
                     + " AI-written letters, so this one is built only from your resume and the posting.");
         } else {
             try {

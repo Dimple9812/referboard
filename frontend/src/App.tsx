@@ -18,6 +18,11 @@ const NotificationsPage = lazy(() => import('@/pages/NotificationsPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 const CoverLetterPage = lazy(() => import('@/pages/CoverLetterPage'));
 const ConnectExtensionPage = lazy(() => import('@/pages/ConnectExtensionPage'));
+const InterviewListPage = lazy(() => import('@/pages/InterviewListPage'));
+const InterviewPrepPage = lazy(() => import('@/pages/InterviewPrepPage'));
+const InsightsPage = lazy(() => import('@/pages/InsightsPage'));
+const AdminPage = lazy(() => import('@/pages/InsightsPage').then((m) => ({ default: m.AdminPage })));
+const ProPage = lazy(() => import('@/pages/ProPage'));
 
 export default function App() {
   return (
@@ -43,6 +48,11 @@ export default function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/cover-letters/:id" element={<CoverLetterPage />} />
             <Route path="/connect-extension" element={<ConnectExtensionPage />} />
+            <Route path="/interview" element={<InterviewListPage />} />
+            <Route path="/interview/:id" element={<InterviewPrepPage />} />
+            <Route path="/insights" element={<InsightsPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/pro" element={<ProPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

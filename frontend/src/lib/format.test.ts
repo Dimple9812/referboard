@@ -18,3 +18,10 @@ test('plural', () => {
   expect(plural(1, 'contact')).toBe('1 contact');
   expect(plural(3, 'contact')).toBe('3 contacts');
 });
+
+test('rupees use Indian grouping without paise', async () => {
+  const { rupees } = await import('./format');
+  expect(rupees(29900)).toBe('₹299');
+  expect(rupees(249900)).toBe('₹2,499');
+  expect(rupees(12345600)).toBe('₹1,23,456');
+});

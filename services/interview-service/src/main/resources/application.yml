@@ -1,0 +1,95 @@
+server:
+  port: ${PORT:8091}
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+spring:
+  application:
+    name: interview-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/referboard?currentSchema=interview,public}
+    username: ${DB_USERNAME:interview_svc}
+    password: ${DB_PASSWORD:interview_svc}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: interview
+        jdbc.time_zone: UTC
+  flyway:
+    schemas: interview
+    default-schema: interview
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        delivery.timeout.ms: 15000
+        request.timeout.ms: 10000
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: 3000
+            read-timeout: 10000
+
+eureka:
+  client:
+    enabled: ${EUREKA_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+referboard:
+  security:
+    jwt:
+      jwk-set-uri: ${JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+      issuer: ${JWT_ISSUER:referboard-auth}
+      audience: ${JWT_AUDIENCE:referboard}
+  ai:
+    llm:
+      provider: ${LLM_PROVIDER:auto}
+      anthropic:
+        api-key: ${ANTHROPIC_API_KEY:}
+        model: ${ANTHROPIC_MODEL:claude-sonnet-5-5}
+      openai:
+        api-key: ${OPENAI_API_KEY:}
+        model: ${OPENAI_MODEL:gpt-4.1-mini}
+    embedding:
+      provider: hashing          # interview-service doesn't use embeddings
+  clients:
+    # Empty = resolve through Eureka (lb://). Set a URL to call a service directly (local runs, tests).
+    analyzer-service-url: ${ANALYZER_SERVICE_URL:}
+  interview:
+    free-packs-per-month: ${INTERVIEW_FREE_PACKS_PER_MONTH:3}   # Pro is unlimited
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    correlation: "[%X{correlationId:-}] "

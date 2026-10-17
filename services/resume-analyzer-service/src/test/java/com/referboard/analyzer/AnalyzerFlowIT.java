@@ -236,6 +236,11 @@ class AnalyzerFlowIT {
         assertThat(again.get("id").asText()).isEqualTo(ids.get("analysis"));
         assertThat(jdParseCalls.get()).isEqualTo(parsesBefore);
         assertThat(json(get("/api/analyses/usage", TOKEN), 200).get("used").asInt()).isEqualTo(1);
+        // One AnalysisCompleted for the new analysis (scores only); none for the reused one.
+        assertThat(jdbc.queryForObject("select count(*) from outbox_events where event_type = 'AnalysisCompleted'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select payload::text from outbox_events where event_type = 'AnalysisCompleted'",
+                String.class)).contains("\"score\": " + score).doesNotContain("Spring Boot services");
     }
 
     @Test
@@ -415,8 +420,15 @@ class AnalyzerFlowIT {
 
     @Test
     @Order(8)
-    void isolationAndAuth() {
+    void isolationAndAuth() throws Exception {
         String other = TestJwt.tokenFor(UUID.randomUUID());
+        JsonNode ctx = json(get("/api/analyses/" + ids.get("analysis") + "/context", TOKEN), 200);
+        assertThat(ctx.at("/resume/fullName").asText()).isEqualTo("Asha Rao");
+        assertThat(ctx.at("/resume/experiences/0/bullets/0").asText()).startsWith("Built Spring Boot services");
+        assertThat(ctx.at("/parsedJd/requiredSkills").toString()).contains("grpc");
+        assertThat(ctx.get("yearsOfExperience").asText()).isNotBlank();
+        assertThat(get("/api/analyses/" + ids.get("analysis") + "/context", other).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(get("/api/analyses/" + ids.get("analysis"), other).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(get("/api/resume-versions/" + ids.get("version"), other).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(get("/api/analyses", null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);

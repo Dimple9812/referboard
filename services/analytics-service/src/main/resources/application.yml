@@ -1,0 +1,82 @@
+server:
+  port: ${PORT:8092}
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+spring:
+  application:
+    name: analytics-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/referboard?currentSchema=analytics,public}
+    username: ${DB_USERNAME:analytics_svc}
+    password: ${DB_PASSWORD:analytics_svc}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: analytics
+        jdbc.time_zone: UTC
+  flyway:
+    schemas: analytics
+    default-schema: analytics
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: analytics-service
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        max.poll.records: 200
+    listener:
+      ack-mode: record
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        delivery.timeout.ms: 15000
+        request.timeout.ms: 10000
+
+eureka:
+  client:
+    enabled: ${EUREKA_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+referboard:
+  security:
+    jwt:
+      jwk-set-uri: ${JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+      issuer: ${JWT_ISSUER:referboard-auth}
+      audience: ${JWT_AUDIENCE:referboard}
+  outbox:
+    relay-enabled: false   # this service only consumes events; it has no outbox table
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    correlation: "[%X{correlationId:-}] "

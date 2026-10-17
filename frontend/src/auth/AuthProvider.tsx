@@ -13,6 +13,8 @@ interface AuthState {
   signup: (fullName: string, email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Fetches a fresh access token and user (e.g. after buying Pro, so the new role and plan apply now). */
+  reload: () => Promise<User>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -58,6 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout: async () => {
       await authApi.logout().catch(() => undefined);
       clear();
+    },
+    reload: async () => {
+      const r = await authApi.refresh();
+      accept(r);
+      return r.user;
     },
   }), [status, user, accept, clear]);
 

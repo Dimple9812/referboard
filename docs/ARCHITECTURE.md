@@ -11,6 +11,7 @@ flowchart LR
     subgraph Client
         SPA["React SPA<br/>(Vite, TanStack Query)"]
         EXT["Chrome extension<br/>(Phase 2)"]
+        RZP["Razorpay<br/>Checkout + webhooks"]
     end
 
     SPA & EXT -->|"HTTPS /api/**<br/>Bearer JWT"| GW
@@ -20,7 +21,8 @@ flowchart LR
         EU[("discovery-server<br/>Eureka")]
     end
 
-    GW -->|lb://| AUTH & PROF & JOB & REF & ANA & TRK & NOTIF
+    RZP -->|webhooks| GW
+    GW -->|lb://| AUTH & PROF & JOB & REF & ANA & TRK & NOTIF & BIL & INT & ANL
 
     subgraph Services
         AUTH["auth-service"]
@@ -31,7 +33,14 @@ flowchart LR
         ANA["resume-analyzer-service"]
         TRK["tracker-service"]
         NOTIF["notification-service"]
+        BIL["billing-service<br/>(Phase 3)"]
+        INT["interview-service<br/>(Phase 3)"]
+        ANL["analytics-service<br/>(Phase 3)"]
     end
+
+    BIL -->|"orders, payments, capture"| RZP_API[(Razorpay API)]
+    INT -->|"Feign: analysis context"| ANA
+    INT -->|LLM| LLM
 
     AUTH -. JWKS .-> GW
     ING -->|"Greenhouse / Lever / Ashby<br/>public board APIs, Adzuna"| EXT_API[(Public job APIs)]
@@ -43,13 +52,15 @@ flowchart LR
     ING -- "JobUpserted / JobClosed" --> K
     JOB -- DailyMatchDigest --> K
     REF -- "ReferralStatusChanged / ReferralReminderDue" --> K
-    ANA -- ResumeVersionCreated --> K
+    ANA -- "ResumeVersionCreated / AnalysisCompleted" --> K
     TRK -- ApplicationStatusChanged --> K
-    K --> JOB & TRK & NOTIF
+    BIL -- ProStatusChanged --> K
+    INT -- InterviewPrepCreated --> K
+    K --> JOB & TRK & NOTIF & AUTH & ANL
 
     PG[("PostgreSQL 16 + pgvector<br/>schema per service")]
     R[(Redis)]
-    AUTH & PROF & ING & JOB & REF & ANA & TRK & NOTIF --- PG
+    AUTH & PROF & ING & JOB & REF & ANA & TRK & NOTIF & BIL & INT & ANL --- PG
     GW & JOB & ANA --- R
 ```
 
@@ -79,6 +90,9 @@ flowchart LR
 | Skill vocabulary | One taxonomy (`skills.yml`) shared by profile, jobs and the analyzer | "K8s" on a resume and "Kubernetes" in a JD must be the same skill everywhere, or match scores lie. |
 | Timezone | All JVMs and DB sessions in **UTC**; UI renders in `Asia/Kolkata` or the user's zone | Also avoids PostgreSQL rejecting the legacy JVM id `Asia/Calcutta`. |
 | Tracker | Kept as its own service | resume-analyzer and referral both feed it via events; analytics in Phase 3 reads from it. |
+| Pro | **One-time passes** (30/365 days) via Razorpay Orders + Checkout, no subscriptions | No e-mandate (RBI recurring-payment rules) or renewal failures to handle; buying again simply extends. The entitlement lives in billing; auth only mirrors `pro_until` from an event and puts `PRO` in tokens, so every service gates with a role check and no service calls billing. |
+| Interview prep | Its own service, reading the analyzer's **context endpoint** with the user's token | The analyzer already holds the parsed JD and resume snapshot; copying it into events would duplicate large documents. A per-request Feign call keeps the analyzer the owner and enforces ownership for free. |
+| Analytics | Event-sourced read model in its own schema | Never queries other services' tables; it can be rebuilt by replaying topics. |
 
 ## 3. Maven module structure
 
@@ -104,7 +118,10 @@ referboard/                         parent POM (Spring Boot 3.5.x, Spring Cloud 
 │   ├── referral-service/           :8085
 │   ├── resume-analyzer-service/    :8086
 │   ├── tracker-service/            :8087
-│   └── notification-service/       :8088
+│   ├── notification-service/       :8088
+│   ├── billing-service/            :8089  (Phase 3)
+│   ├── interview-service/          :8091  (Phase 3)
+│   └── analytics-service/          :8092  (Phase 3)
 ├── frontend/                       React 18 + TS + Vite
 ├── docker/                         service.Dockerfile, postgres/init.sql
 └── docker-compose.yml
@@ -144,6 +161,10 @@ refresh_tokens (
   expires_at, revoked_at, replaced_by uuid, user_agent, ip_address, created_at,
   client ('WEB'|'EXTENSION'))   -- a token only works on its own client's refresh endpoint
   index (user_id), (family_id), (expires_at), (user_id, client) where revoked_at is null
+
+-- V4 (Phase 3): users.pro_until, users.pro_changed_at, mirrored from billing.pro-status-changed.v1.
+-- Tokens carry PRO while pro_until > now (role stays USER in the table); an event older than
+-- pro_changed_at is ignored, so redelivery or reordering can't undo a newer change.
 ```
 
 ### 4.2 `profile` — profile-service ✅ implemented
@@ -390,6 +411,9 @@ Implementation notes:
   requests can't exceed it; a failed analysis gives its unit back.
 - **Rendering:** POI (DOCX) and OpenPDF (PDF, standard Helvetica, Windows-1252 text) — one column, real text,
   plain headings and bullets, no tables, text boxes or images.
+- **Phase 3:** `GET /api/analyses/{id}/context` returns the parsed JD and resume facts (roles with numbered
+  bullets, skills, gaps) for interview-service; owner-only like every analysis read. Each completed analysis
+  publishes `analysis.completed.v1`; Pro users get 5× the daily AI cover-letter cap.
 - `ExperienceMath` (years from dated roles, overlaps merged) moved to the shared `skills` module so profile-service
   and the analyzer compute experience identically.
 
@@ -443,7 +467,7 @@ recipients (user_id pk, email, full_name, created_at, updated_at)        -- from
 notification_preferences (user_id pk, email_reminders bool, email_digest bool,
   unsubscribe_token uuid unique, updated_at)
 
-notifications (id, user_id, type ('REFERRAL_REMINDER'|'DAILY_DIGEST'|'WELCOME'|'SYSTEM'), title, body,
+notifications (id, user_id, type ('REFERRAL_REMINDER'|'DAILY_DIGEST'|'WELCOME'|'SYSTEM'|'BILLING'|'INTERVIEW'), title, body,
   link /* app path */, data jsonb, dedup_key, read_at, created_at, deleted_at)
   unique (user_id, dedup_key)                     -- reminder:{id}, digest:{date}, welcome
   index (user_id, created_at desc) where deleted_at is null; index (user_id) where unread
@@ -471,6 +495,84 @@ Implementation notes:
   per-user random token in the link.
 - Mail health is excluded from readiness: an SMTP outage queues mail, it doesn't take the service down.
 
+### 4.9 `billing` — billing-service ✅ implemented (Phase 3)
+
+```sql
+orders (id, user_id, plan ('PRO_MONTH'|'PRO_YEAR'), amount_paise bigint, currency varchar(3), days,
+  receipt unique, razorpay_order_id unique, status ('CREATED'|'PAID'|'REFUNDED'|'EXPIRED'),
+  razorpay_payment_id unique null, method, pro_from, pro_until /* the period this order paid for */,
+  created_at, paid_at, refunded_at, version)
+
+entitlements (user_id pk, pro_until, updated_at)      -- row-locked while a payment or refund is applied
+webhook_events (event_id pk /* X-Razorpay-Event-Id */, event_type, received_at, payload jsonb)
+outbox_events, processed_events
+```
+
+Implementation notes:
+
+- **Amounts come from server config**, never the client. Orders are created with Razorpay's Orders API; Checkout
+  runs in the browser; the server verifies `HMAC_SHA256(order_id|payment_id, key_secret)` in constant time, then
+  fetches the payment and captures it if it's only authorised.
+- **Two paths, one outcome:** the browser's verify call and Razorpay's webhook both go through `markPaid`, which
+  locks the order row; whichever comes second is a no-op. Webhooks are authenticated by
+  `HMAC_SHA256(raw body, webhook_secret)` and de-duplicated by event id in the same transaction.
+- **Pro period:** `pro_from = max(now, entitlement.pro_until)`, `pro_until = pro_from + days`. A full refund
+  subtracts that order's days from the entitlement; a partial refund is recorded but changes nothing.
+- Each change writes `billing.pro-status-changed.v1` to the outbox. Times are truncated to microseconds so the
+  event and the stored values compare equal downstream. Unpaid orders expire after `orderTtl` (2 h).
+- Public at the gateway: `GET /api/billing/plans` and `POST /api/billing/webhooks/razorpay`. Without keys the
+  service reports `available: false` and returns 503 `PAYMENTS_UNAVAILABLE`.
+
+### 4.10 `interview` — interview-service ✅ implemented (Phase 3)
+
+```sql
+prep_packs (id, user_id, analysis_id, job_id null, job_title, company_name, origin ('RULES'|'AI'), model,
+  created_at, deleted_at)
+
+prep_items (id, pack_id fk, position, section ('INTRO'|'TECHNICAL'|'ROLE'|'BEHAVIOURAL'|'GAPS'|'ASK'),
+  question, checks, tip, evidence /* a resume bullet, verbatim */, evidence_from, skill, origin,
+  notes /* the user's own */, confidence ('NEW'|'PRACTISING'|'CONFIDENT'), updated_at, version)
+  unique (pack_id, position)
+
+outbox_events, processed_events
+```
+
+Implementation notes:
+
+- `PrepBuilder` is deterministic: a YAML question bank keyed by canonical skill names from the shared taxonomy,
+  responsibilities from the parsed JD, behavioural questions matched to bullets by keyword (an already-used
+  bullet is reused rather than leaving a question without an example), gap questions for missing required skills,
+  and questions to ask (more for senior roles).
+- **Truthfulness:** `AiQuestions` asks the LLM for extra questions with a forced schema in which evidence is a
+  bullet **index**; the text shown is always taken from the resume. Out-of-range indexes, duplicates and empty
+  questions are dropped. Without an LLM, packs are rules-only.
+- Free users: `INTERVIEW_FREE_PACKS_PER_MONTH` (3) per calendar month (UTC), counted from `prep_packs`;
+  `PRO`/`ADMIN` unlimited. 429 `PREP_LIMIT` when used up. Item updates use `version` (409 on conflict).
+- Publishes `interview.prep-created.v1`.
+
+### 4.11 `analytics` — analytics-service ✅ implemented (Phase 3)
+
+```sql
+user_facts (user_id pk, registered_at, pro_until, pro_changed_at, first_purchase_at)
+applications (application_id pk, user_id, job_id, stage, stage_changed_at, created_at,
+  applied_at, referral_requested_at, referred_at, interview_at, offer_at, rejected_at)  -- first time each was reached
+contacts (contact_id pk, user_id, job_id, status, status_changed_at, created_at,
+  request_sent_at, connected_at, asked_at, referred_at, no_response_at)
+activity (event_id pk, user_id, kind, occurred_at, day /* IST */, score, delta, amount_paise, ref_id)
+processed_events
+```
+
+Implementation notes:
+
+- **Consume only** (relay disabled). Consumes `user.registered`, `application.status-changed`,
+  `referral.status-changed`, `analysis.completed`, `resume.version-created`, `interview.prep-created` and
+  `billing.pro-status-changed`.
+- **Order-tolerant:** first-reached columns use `least(...)`; current stage/status change only for a newer
+  `changedAt`; one `activity` row per event id. Redelivery and reordering give the same result.
+- `GET /api/insights`: funnel, referred-vs-cold interview rate (null below 5 applications per group), referral
+  outreach funnel, median days to interview, 12 Monday-start IST weeks, resume work, and highlights that only
+  restate the numbers. `GET /api/insights/admin` (ADMIN): aggregate counts and revenue only.
+
 ## 5. Kafka event contracts
 
 Source: `platform/event-contracts`. Every payload embeds `metadata`:
@@ -482,15 +584,18 @@ Source: `platform/event-contracts`. Every payload embeds `metadata`:
 
 | Topic | Producer → Consumers | Key | Payload (besides `metadata`) |
 |---|---|---|---|
-| `user.registered.v1` (compacted, unlimited retention) | auth → notification | userId | userId, email, fullName, authProvider |
+| `user.registered.v1` (compacted, unlimited retention) | auth → notification, analytics | userId | userId, email, fullName, authProvider |
 | `profile.updated.v1` | profile → job | userId | userId, profileVersion, headline, skills[], totalExperienceYears, college, pastCompanies[], preferences{roles[], locations[], remoteOnly, openToRemote, minSalaryInr, experienceLevel}, embedding[], embeddingModel, embeddingDimensions |
 | `job.upserted.v1` | ingestion → job | jobId | jobId, dedupKey, source, sourceJobId, companyName, companySlug, title, normalizedTitle, location, country, remote, employmentType, seniority, departmentName, descriptionHtml, descriptionText, applyUrl, salaryMin/Max/Currency, postedAt, firstSeenAt, lastSeenAt, skills[], embedding[], embeddingModel, ghostJobSuspected, contentHash |
 | `job.closed.v1` | ingestion → job, tracker | jobId | jobId, closedAt, reason (`UNSEEN_7_DAYS`) |
 | `match.daily-digest.v1` | job → notification | userId | userId, digestDate, matches[≤10]{jobId, title, companyName, location, remote, matchPercent, matchedSkills[]} |
-| `referral.status-changed.v1` | referral → tracker | userId | userId, jobId, jobTitle, companyName, jobLocation, applyUrl, contactId, contactName, previousStatus, newStatus, changedAt |
+| `referral.status-changed.v1` | referral → tracker, analytics | userId | userId, jobId, jobTitle, companyName, jobLocation, applyUrl, contactId, contactName, previousStatus, newStatus, changedAt |
 | `referral.reminder-due.v1` | referral → notification | userId | reminderId, userId, contactId, jobId, contactName, jobTitle, companyName, reminderType, message, draftedFollowUp, dueAt |
-| `resume.version-created.v1` | analyzer → tracker | userId | userId, resumeVersionId, versionName, jobId, analysisId, scoreBefore, scoreAfter, fileFormat |
-| `application.status-changed.v1` | tracker → (Phase 3 analytics; the user made or caused the change, so no notification) | userId | userId, applicationId, jobId, previousStage, newStage, resumeVersionId, changedAt |
+| `resume.version-created.v1` | analyzer → tracker, analytics | userId | userId, resumeVersionId, versionName, jobId, analysisId, scoreBefore, scoreAfter, fileFormat |
+| `application.status-changed.v1` | tracker → analytics, notification (only the INTERVIEW stage: a prep nudge) | userId | userId, applicationId, jobId, previousStage, newStage, resumeVersionId, changedAt |
+| `analysis.completed.v1` | analyzer → analytics | userId | userId, analysisId, jobId, jdSource, score, verdict, completedAt |
+| `interview.prep-created.v1` | interview → analytics | userId | userId, prepId, jobId, questionCount, createdAt |
+| `billing.pro-status-changed.v1` | billing → auth, notification, analytics | userId | userId, reason (`PURCHASE`/`REFUND`), plan, proUntil, orderId, amountPaise (negative for refunds), currency, changedAt |
 
 **Compatibility rules:** consumers ignore unknown fields (`@JsonIgnoreProperties(ignoreUnknown = true)`, covered
 by `EventContractsTest`); adding optional fields keeps the topic; removing/renaming fields or changing meaning
@@ -522,7 +627,11 @@ requires a new `.v2` topic, with the producer dual-writing until consumers migra
 - Unknown-email logins spend the same bcrypt time as real ones (no timing oracle).
 - Every service re-validates the JWT and scopes data by `sub`; IDs in paths are always checked against the
   owner.
-- Swagger, `/actuator/health/**` and JWKS are the only unauthenticated non-auth endpoints.
+- Swagger, `/actuator/health/**` and JWKS are the only unauthenticated non-auth endpoints, plus the public
+  billing plan list and the Razorpay webhook, which is authenticated by its HMAC signature instead of a JWT.
+- Payments: ReferBoard never handles card or bank details (Razorpay Checkout runs on Razorpay's frames); the CSP
+  allows only `checkout.razorpay.com` / `api.razorpay.com` for that. Key and webhook secrets are environment
+  variables only.
 
 ## 7. Cross-cutting
 

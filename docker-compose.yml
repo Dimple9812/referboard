@@ -320,6 +320,65 @@ services:
       discovery-server: { condition: service_healthy }
       mailpit: { condition: service_started }
 
+  billing-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args: { MODULE: services/billing-service }
+    ports: ["8089:8089"]
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/referboard?currentSchema=billing,public
+      DB_USERNAME: ${BILLING_DB_USERNAME:-billing_svc}
+      DB_PASSWORD: ${BILLING_DB_PASSWORD:-billing_svc}
+      # Empty keys = payments switched off (the Pro page says so). Use rzp_test_ keys to try it.
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      PRO_MONTH_PRICE_PAISE: ${PRO_MONTH_PRICE_PAISE:-29900}
+      PRO_YEAR_PRICE_PAISE: ${PRO_YEAR_PRICE_PAISE:-249900}
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+
+  interview-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args: { MODULE: services/interview-service }
+    ports: ["8091:8091"]
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/referboard?currentSchema=interview,public
+      DB_USERNAME: ${INTERVIEW_DB_USERNAME:-interview_svc}
+      DB_PASSWORD: ${INTERVIEW_DB_PASSWORD:-interview_svc}
+      LLM_PROVIDER: ${LLM_PROVIDER:-auto}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      INTERVIEW_FREE_PACKS_PER_MONTH: ${INTERVIEW_FREE_PACKS_PER_MONTH:-3}
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+
+  analytics-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args: { MODULE: services/analytics-service }
+    ports: ["8092:8092"]
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/referboard?currentSchema=analytics,public
+      DB_USERNAME: ${ANALYTICS_DB_USERNAME:-analytics_svc}
+      DB_PASSWORD: ${ANALYTICS_DB_PASSWORD:-analytics_svc}
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+
 volumes:
   resumes:
   pgdata:

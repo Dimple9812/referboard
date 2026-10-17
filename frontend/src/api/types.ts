@@ -17,6 +17,10 @@ export interface User {
   avatarUrl?: string | null;
   authProvider: string;
   emailVerified: boolean;
+  role?: string;
+  /** PRO while a paid pass runs (or for PRO/ADMIN roles). */
+  plan?: 'PRO' | 'FREE';
+  proUntil?: string | null;
 }
 export interface AuthResponse {
   accessToken: string;
@@ -171,6 +175,54 @@ export interface CoverLetter {
   length: LetterLength; origin: 'TEMPLATE' | 'AI'; body: string; generatedBody?: string | null; edited: boolean;
   motivation?: string | null; notices?: string[] | null; createdAt: string; updatedAt?: string | null; version: number;
   downloadPath: string;
+}
+
+// ---------- interview prep ----------
+export type PrepSection = 'INTRO' | 'TECHNICAL' | 'ROLE' | 'BEHAVIOURAL' | 'GAPS' | 'ASK';
+export type Confidence = 'NEW' | 'PRACTISING' | 'CONFIDENT';
+export interface PrepItem {
+  id: string; section: PrepSection; question: string; checks?: string | null; tip?: string | null;
+  /** One of the user's resume bullets, verbatim. */
+  evidence?: string | null; evidenceFrom?: string | null; skill?: string | null; origin: 'RULES' | 'AI';
+  notes?: string | null; confidence: Confidence; version: number;
+}
+export interface InterviewPrep {
+  id: string; analysisId: string; jobId?: string | null; jobTitle?: string | null; companyName?: string | null;
+  origin: 'RULES' | 'AI'; createdAt: string; items: PrepItem[]; notices?: string[] | null;
+}
+export interface PrepSummary {
+  id: string; analysisId: string; jobId?: string | null; jobTitle?: string | null; companyName?: string | null;
+  origin: 'RULES' | 'AI'; createdAt: string; total: number; practising: number; confident: number;
+}
+
+// ---------- billing ----------
+export interface Plan { id: string; name: string; amountPaise: number; currency: string; days: number }
+export interface PlansResponse { available: boolean; testMode: boolean; plans: Plan[] }
+export interface Checkout {
+  orderId: string; razorpayOrderId: string; keyId: string; amountPaise: number; currency: string; name: string;
+  description: string; testMode: boolean;
+}
+export interface Order {
+  id: string; plan: string; planName: string; amountPaise: number; currency: string; status: 'PAID' | 'REFUNDED';
+  method?: string | null; receipt: string; razorpayPaymentId?: string | null; createdAt: string; paidAt?: string | null;
+  proFrom?: string | null; proUntil?: string | null; refundedAt?: string | null;
+}
+export interface BillingStatus { plan: 'PRO' | 'FREE'; proUntil?: string | null; daysLeft?: number | null; orders: Order[] }
+
+// ---------- insights ----------
+export interface InsightGroup { applications: number; interviews: number; rate?: number | null }
+export interface Insights {
+  funnel: { saved: number; applied: number; referred: number; interview: number; offer: number; rejected: number };
+  referredVsCold: { referred: InsightGroup; cold: InsightGroup; minSample: number };
+  referrals: { added: number; requested: number; connected: number; asked: number; referred: number; noResponse: number };
+  medianDaysToInterview?: number | null;
+  resumes: { analyses: number; averageScore?: number | null; bestScore?: number | null; tailored: number; avgGain?: number | null; prepPacks: number };
+  weekly: { weekStart: string; saved: number; applied: number; referralAsks: number; interviews: number; analyses: number; averageScore?: number | null }[];
+  highlights: string[];
+}
+export interface AdminMetrics {
+  users: number; proNow: number; everPaid: number; paidConversionPct?: number | null; revenuePaise: number;
+  weekly: { weekStart: string; signups: number; activeUsers: number; analyses: number; referralAsks: number; prepPacks: number; purchases: number; revenuePaise: number }[];
 }
 
 // ---------- extension ----------

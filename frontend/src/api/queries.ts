@@ -3,7 +3,8 @@ import { api } from './client';
 import type {
   AnalysisReport, AnalysisSummary, AppNotification, Board, CardDetail, Contact, ContactDetail, ContactPage, CoverLetter,
   LetterLength,
-  ContactStatus, DraftSet, ExtensionConnection, EmailPreferences, JobDetail, JobPage, JobSearch, NotificationPage, PersonType, Pipeline,
+  AdminMetrics, BillingStatus, Checkout, Confidence, ContactStatus, DraftSet, ExtensionConnection, Insights, InterviewPrep,
+  PlansResponse, PrepItem, PrepSummary, EmailPreferences, JobDetail, JobPage, JobSearch, NotificationPage, PersonType, Pipeline,
   Preferences, Profile, Reminder, Resume, ResumeVersion, Stage, Suggestions, Usage,
 } from './types';
 
@@ -31,6 +32,13 @@ export const keys = {
   letters: (jobId?: string) => ['letters', jobId ?? 'all'] as const,
   letter: (id: string) => ['letter', id] as const,
   extensions: ['extensions'] as const,
+  preps: (jobId?: string) => ['preps', jobId ?? 'all'] as const,
+  prep: (id: string) => ['prep', id] as const,
+  prepUsage: ['preps', 'usage'] as const,
+  billing: ['billing'] as const,
+  plans: ['billing', 'plans'] as const,
+  insights: ['insights'] as const,
+  adminMetrics: ['insights', 'admin'] as const,
   notifications: ['notifications'] as const,
   unread: ['notifications', 'unread'] as const,
   emailPrefs: ['notifications', 'prefs'] as const,
@@ -372,6 +380,62 @@ export function useDeleteLetter() {
 
 export const downloadLetter = (id: string, format: 'DOCX' | 'PDF') =>
   downloadFile(`/api/cover-letters/${id}/file`, format, 'cover-letter');
+
+// ---------- interview prep ----------
+export const usePreps = (jobId?: string, enabled = true) =>
+  useQuery({ queryKey: keys.preps(jobId), queryFn: () => get<PrepSummary[]>('/api/interview-preps', jobId ? { jobId } : undefined), enabled });
+
+export const usePrep = (id: string) =>
+  useQuery({ queryKey: keys.prep(id), queryFn: () => get<InterviewPrep>(`/api/interview-preps/${id}`) });
+
+export const usePrepUsage = () =>
+  useQuery({ queryKey: keys.prepUsage, queryFn: () => get<Usage>('/api/interview-preps/usage') });
+
+export function useMakePrep() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (analysisId: string) => api.post<InterviewPrep>('/api/interview-preps', { analysisId }).then((r) => r.data),
+    onSuccess: (p) => {
+      qc.setQueryData(keys.prep(p.id), p);
+      qc.invalidateQueries({ queryKey: ['preps'] });
+    },
+  });
+}
+
+/** Saves one question's notes or confidence (with its version) and updates the cached pack in place. */
+export function useSavePrepAnswer(prepId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (v: { itemId: string; notes?: string; confidence?: Confidence; version: number }) =>
+      api.patch<PrepItem>(`/api/interview-preps/${prepId}/items/${v.itemId}`,
+        { notes: v.notes, confidence: v.confidence, version: v.version }).then((r) => r.data),
+    onSuccess: (item) => {
+      qc.setQueryData<InterviewPrep>(keys.prep(prepId), (old) =>
+        old && { ...old, items: old.items.map((i) => (i.id === item.id ? item : i)) });
+      qc.invalidateQueries({ queryKey: keys.preps() });
+    },
+  });
+}
+
+export function useDeletePrep() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/api/interview-preps/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['preps'] }),
+  });
+}
+
+// ---------- billing ----------
+export const usePlans = () => useQuery({ queryKey: keys.plans, queryFn: () => get<PlansResponse>('/api/billing/plans'), staleTime: 300_000 });
+export const useBilling = () => useQuery({ queryKey: keys.billing, queryFn: () => get<BillingStatus>('/api/billing/me') });
+export const createOrder = (plan: string) => api.post<Checkout>('/api/billing/orders', { plan }).then((r) => r.data);
+export const verifyPayment = (orderId: string, razorpayPaymentId: string, razorpaySignature: string) =>
+  api.post<BillingStatus>(`/api/billing/orders/${orderId}/verify`, { razorpayPaymentId, razorpaySignature }).then((r) => r.data);
+
+// ---------- insights ----------
+export const useInsights = () => useQuery({ queryKey: keys.insights, queryFn: () => get<Insights>('/api/insights', { weeks: 12 }) });
+export const useAdminMetrics = () => useQuery({ queryKey: keys.adminMetrics, queryFn: () => get<AdminMetrics>('/api/insights/admin', { weeks: 12 }) });
 
 // ---------- browser extension ----------
 export const useExtensionConnections = () =>

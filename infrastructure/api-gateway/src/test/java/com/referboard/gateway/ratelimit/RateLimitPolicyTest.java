@@ -22,6 +22,8 @@ class RateLimitPolicyTest {
         assertThat(RateLimitPolicy.classify(HttpMethod.POST, "/api/analyses/abc/resume")).isEqualTo(DEFAULT);
         assertThat(RateLimitPolicy.classify(HttpMethod.POST, "/api/analyses/abc/cover-letters")).isEqualTo(EXPENSIVE);
         assertThat(RateLimitPolicy.classify(HttpMethod.PUT, "/api/cover-letters/abc")).isEqualTo(DEFAULT);
+        assertThat(RateLimitPolicy.classify(HttpMethod.POST, "/api/interview-preps")).isEqualTo(EXPENSIVE);
+        assertThat(RateLimitPolicy.classify(HttpMethod.PATCH, "/api/interview-preps/abc/items/def")).isEqualTo(DEFAULT);
         assertThat(RateLimitPolicy.classify(HttpMethod.GET, "/api/analyses")).isEqualTo(DEFAULT);
         assertThat(RateLimitPolicy.classify(HttpMethod.POST, "/api/referrals/contacts/123/drafts")).isEqualTo(EXPENSIVE);
         assertThat(RateLimitPolicy.classify(HttpMethod.POST, "/api/profile/resumes")).isEqualTo(EXPENSIVE);

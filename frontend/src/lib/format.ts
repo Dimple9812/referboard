@@ -36,3 +36,10 @@ export function salaryRange(min?: number | null, max?: number | null, currency?:
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
+
+const INR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+
+/** Paise → "₹2,499" (Indian digit grouping). */
+export function rupees(paise: number): string {
+  return INR.format(Math.round(paise / 100));
+}

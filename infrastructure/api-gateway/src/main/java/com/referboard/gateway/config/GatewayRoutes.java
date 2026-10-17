@@ -25,7 +25,8 @@ public class GatewayRoutes {
     /** Swagger docs name → service key. */
     static final String[][] DOCS = {{"auth", "auth"}, {"profile", "profile"}, {"jobs", "jobs"},
             {"ingestion", "ingestion"}, {"referral", "referral"}, {"analyzer", "analyzer"}, {"tracker", "tracker"},
-            {"notification", "notification"}};
+            {"notification", "notification"}, {"billing", "billing"}, {"interview", "interview"},
+            {"analytics", "analytics"}};
 
     @Bean
     public RouteLocator routes(RouteLocatorBuilder builder, GatewayProperties props) {
@@ -40,7 +41,10 @@ public class GatewayRoutes {
                         props.service("analyzer"), LLM_TIMEOUT))
                 .route("tracker", api(p -> p.path("/api/applications/**"), props.service("tracker"), DEFAULT_TIMEOUT))
                 .route("notification", api(p -> p.path("/api/notifications/**"), props.service("notification"),
-                        DEFAULT_TIMEOUT));
+                        DEFAULT_TIMEOUT))
+                .route("billing", api(p -> p.path("/api/billing/**"), props.service("billing"), DEFAULT_TIMEOUT))
+                .route("interview", api(p -> p.path("/api/interview-preps/**"), props.service("interview"), LLM_TIMEOUT))
+                .route("analytics", api(p -> p.path("/api/insights/**"), props.service("analytics"), DEFAULT_TIMEOUT));
         for (String[] doc : DOCS) {
             String name = doc[0];
             r = r.route("docs-" + name, p -> p.path("/v3/api-docs/" + name)

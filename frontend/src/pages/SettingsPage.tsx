@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Download, FileText } from 'lucide-react';
 import {
-  downloadVersion, useCoverLetters, useDisconnectExtension, useEmailPrefs, useExtensionConnections, useMakePrimary, useProfile, useResumes, useSaveEmailPrefs, useSavePreferences,
+  downloadVersion, useBilling, useCoverLetters, useDisconnectExtension, useEmailPrefs, useExtensionConnections, useMakePrimary, useProfile, useResumes, useSaveEmailPrefs, useSavePreferences,
   useUploadResume, useUsage, useVersions,
 } from '@/api/queries';
 import { errorMessage } from '@/api/client';
@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Field';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/States';
-import { shortDate, timeAgo } from '@/lib/format';
+import { rupees, shortDate, timeAgo } from '@/lib/format';
 
 /** Settings are a stack of sections: what it is on the left, the controls on the right. */
 function Section({ title, description, children }: { title: string; description?: ReactNode; children: ReactNode }) {
@@ -33,10 +33,16 @@ function Section({ title, description, children }: { title: string; description?
 }
 
 export default function SettingsPage() {
+  // Links like /settings#billing land on that section.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView();
+  }, [hash]);
   return (
     <div className="max-w-4xl">
       <PageHeader title="Settings" />
       <AccountSection />
+      <BillingSection />
       <ResumesSection />
       <VersionsSection />
       <LettersSection />
@@ -44,6 +50,53 @@ export default function SettingsPage() {
       <EmailSection />
       <ExtensionSection />
       <UsageSection />
+    </div>
+  );
+}
+
+const METHOD: Record<string, string> = { upi: 'UPI', card: 'Card', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI' };
+
+function BillingSection() {
+  const billing = useBilling();
+  return (
+    <div id="billing" className="scroll-mt-6">
+      <Section title="Plan and payments" description="Pro passes are one-time payments through Razorpay. Nothing renews.">
+        {billing.isPending ? <Skeleton className="h-16" />
+          : billing.isError ? <ErrorState error={billing.error} onRetry={() => billing.refetch()} />
+          : (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium">{billing.data.plan === 'PRO' ? 'Pro' : 'Free plan'}</p>
+                  <p className="text-sm text-slate">
+                    {billing.data.plan === 'PRO'
+                      ? `Until ${shortDate(billing.data.proUntil)}, ${billing.data.daysLeft} day${billing.data.daysLeft === 1 ? '' : 's'} left.`
+                      : '5 JD analyses and 3 interview prep packs a month.'}
+                  </p>
+                </div>
+                <Button asChild variant={billing.data.plan === 'PRO' ? 'outline' : 'primary'}>
+                  <Link to="/pro">{billing.data.plan === 'PRO' ? 'Add more time' : 'Go Pro'}</Link>
+                </Button>
+              </div>
+              {billing.data.orders.length > 0 && (
+                <ul className="divide-y divide-line rounded border border-line bg-surface">
+                  {billing.data.orders.map((o) => (
+                    <li key={o.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium">{o.planName}</p>
+                        <p className="text-xs text-slate">
+                          Paid {shortDate(o.paidAt)}{o.method ? ` by ${METHOD[o.method] ?? o.method}` : ''}. Reference {o.razorpayPaymentId ?? o.receipt}.
+                        </p>
+                      </div>
+                      <span className="tabular">{rupees(o.amountPaise)}</span>
+                      {o.status === 'REFUNDED' && <Badge tone="outline">Refunded</Badge>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+      </Section>
     </div>
   );
 }

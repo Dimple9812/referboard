@@ -4,7 +4,7 @@ import { AlertTriangle, CheckCircle2, Download, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { errorCode, errorMessage } from '@/api/client';
 import {
-  downloadVersion, useAnalyses, useAnalysis, useAnalyze, useCoverLetters, useGenerateResume, useJob, useResumes, useUsage,
+  downloadVersion, useAnalyses, useAnalysis, useAnalyze, useCoverLetters, useMakePrep, usePreps, useGenerateResume, useJob, useResumes, useUsage,
   useVersions, useWriteLetter,
   type ResumeChoice,
 } from '@/api/queries';
@@ -151,7 +151,8 @@ function UsageLine() {
   const { remaining, limit, resetsOn } = usage.data;
   return (
     <p className={cn('text-sm', remaining === 0 ? 'text-danger' : 'text-slate')}>
-      {remaining === 0 ? `You've used all ${limit} free analyses this month. They reset on ${shortDate(resetsOn)}.`
+      {remaining === 0
+        ? <>You've used all {limit} free analyses this month. They reset on {shortDate(resetsOn)}, or <Link to="/pro" className="font-medium underline underline-offset-4">go Pro</Link> for unlimited.</>
         : `${remaining} of ${limit} free analyses left this month. Re-checking the same job and resume within a day is free.`}
     </p>
   );
@@ -345,6 +346,7 @@ function Suggestions({ r }: { r: AnalysisReport }) {
 
       <Generate r={r} decisions={decisions} />
       <WriteLetter r={r} />
+      <PrepareInterview r={r} />
     </>
   );
 }
@@ -472,6 +474,25 @@ function WriteLetter({ r }: { r: AnalysisReport }) {
           </ul>
         </div>
       )}
+    </section>
+  );
+}
+
+function PrepareInterview({ r }: { r: AnalysisReport }) {
+  const navigate = useNavigate();
+  const make = useMakePrep();
+  const existing = usePreps(r.job.jobId ?? undefined).data?.filter((p) => p.analysisId === r.id) ?? [];
+  const limited = errorCode(make.error) === 'PREP_LIMIT';
+  return (
+    <section aria-labelledby="prep" className="rounded-lg border border-line bg-surface p-6">
+      <h2 id="prep" className="text-lg font-semibold">Prepare for the interview</h2>
+      <p className="mt-1 text-sm text-slate">Likely questions for this job, the examples from your own resume to answer with, and honest ways to handle what's missing.</p>
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        {existing.length > 0
+          ? <Button asChild><Link to={`/interview/${existing[0].id}`}>Open your prep pack</Link></Button>
+          : <Button loading={make.isPending} onClick={() => make.mutate(r.id, { onSuccess: (p) => navigate(`/interview/${p.id}`) })}>Build a prep pack</Button>}
+      </div>
+      {limited && <p className="mt-3 text-sm">You've used this month's free prep packs. <Link to="/pro" className="font-medium underline underline-offset-4">Go Pro</Link> for unlimited packs.</p>}
     </section>
   );
 }

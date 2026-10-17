@@ -65,7 +65,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.mail.properties.mail.smtp.connectiontimeout=1000"
 })
 @EmbeddedKafka(partitions = 1, kraft = true, bootstrapServersProperty = "spring.kafka.bootstrap-servers",
-        topics = {Topics.USER_REGISTERED, Topics.REFERRAL_REMINDER_DUE, Topics.DAILY_MATCH_DIGEST})
+        topics = {Topics.USER_REGISTERED, Topics.REFERRAL_REMINDER_DUE, Topics.DAILY_MATCH_DIGEST,
+                Topics.PRO_STATUS_CHANGED, Topics.APPLICATION_STATUS_CHANGED})
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class NotificationFlowIT {
 
@@ -257,6 +258,44 @@ class NotificationFlowIT {
                 "Backend Engineer", "Northwind", "SEND_REFERRAL_MESSAGE",
                 "Connected with " + contactName + " 2 days ago — send your referral message.",
                 "Hi " + contactName.split(" ")[0] + ",\n\nThanks for connecting!", Instant.now());
+    }
+
+    @Test
+    @Order(7)
+    void paymentsAndInterviewsBecomeInAppNotifications() throws Exception {
+        UUID order = UUID.randomUUID();
+        long before = count("select count(*) from email_deliveries");
+        var pro = new com.referboard.events.ProStatusChangedEvent(meta(), USER, "PURCHASE", "PRO_MONTH",
+                Instant.parse("2026-11-15T10:00:00Z"), order, 29900, "INR", Instant.now());
+        send(pro);
+        send(pro);   // redelivered: still one notification
+        UUID app = UUID.randomUUID();
+        UUID job = UUID.randomUUID();
+        send(new com.referboard.events.ApplicationStatusChangedEvent(meta(), USER, app, job, "APPLIED", "REFERRED", null, Instant.now()));
+        send(new com.referboard.events.ApplicationStatusChangedEvent(meta(), USER, app, job, "REFERRED", "INTERVIEW", null, Instant.now()));
+        send(new com.referboard.events.ApplicationStatusChangedEvent(meta(), USER, app, job, "OFFER", "INTERVIEW", null, Instant.now()));
+        JsonNode page = await(() -> {
+            JsonNode p = get("/api/notifications");
+            long billing = 0;
+            long interview = 0;
+            for (JsonNode n : p.get("items")) {
+                billing += n.get("type").asText().equals("BILLING") ? 1 : 0;
+                interview += n.get("type").asText().equals("INTERVIEW") ? 1 : 0;
+            }
+            return billing == 1 && interview == 1 ? p : null;
+        }, "billing and interview notifications");
+        JsonNode billing = null;
+        JsonNode interview = null;
+        for (JsonNode n : page.get("items")) {
+            if (n.get("type").asText().equals("BILLING")) billing = n;
+            if (n.get("type").asText().equals("INTERVIEW")) interview = n;
+        }
+        assertThat(billing.get("title").asText()).isEqualTo("Pro is on");
+        assertThat(billing.get("body").asText()).contains("15 November 2026");
+        assertThat(interview.get("link").asText()).isEqualTo("/interview?jobId=" + job);
+        Thread.sleep(500);
+        assertThat(count("select count(*) from notifications where type = 'INTERVIEW'")).as("once per application").isEqualTo(1);
+        assertThat(count("select count(*) from email_deliveries")).as("in-app only").isEqualTo(before);
     }
 
     private DailyMatchDigestEvent digest(LocalDate date) {

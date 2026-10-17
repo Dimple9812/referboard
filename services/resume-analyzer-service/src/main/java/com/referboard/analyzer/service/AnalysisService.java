@@ -74,11 +74,19 @@ public class AnalysisService {
     private final AnalyzerProperties props;
     private final ObjectMapper mapper;
     private final Clock clock;
+    private final com.referboard.common.events.EventPublisher events;
+    private final com.referboard.common.events.EventJson eventJson;
+    private final org.springframework.transaction.support.TransactionTemplate tx;
 
     public AnalysisService(JdParserService jdParser, ResumeLoader resumes, MatchScorer scorer,
                            SuggestionEngine suggestions, EmbeddingClient embeddings, JdAnalysisRepository analyses,
                            UsageCounters usage, JobClient jobs, VersionContent contentJson, AnalyzerProperties props,
-                           ObjectMapper mapper, Clock clock) {
+                           ObjectMapper mapper, Clock clock, com.referboard.common.events.EventPublisher events,
+                           com.referboard.common.events.EventJson eventJson,
+                           org.springframework.transaction.support.TransactionTemplate tx) {
+        this.events = events;
+        this.eventJson = eventJson;
+        this.tx = tx;
         this.jdParser = jdParser;
         this.resumes = resumes;
         this.scorer = scorer;
@@ -220,7 +228,7 @@ public class AnalysisService {
         return Math.max(0, Math.min(100, current + Math.max(0, after - base)));
     }
 
-    /** Single insert (repository save is transactional on its own). */
+    /** The analysis and its AnalysisCompleted event (scores only, no resume or JD text) in one transaction. */
     private void save(UUID userId, AnalysisReport r, JdInput jd, String hash, String text, ResumeContent content) {
         JdAnalysis a = new JdAnalysis(r.id(), userId);
         a.setJobId(jd.jobId());
@@ -237,7 +245,21 @@ public class AnalysisService {
         a.setProjectedScore((short) r.projectedScore());
         a.setReport(json(r));
         a.setResumeContent(contentJson.write(content));
-        analyses.save(a);
+        tx.executeWithoutResult(s -> {
+            analyses.save(a);
+            events.publish(new com.referboard.events.AnalysisCompletedEvent(eventJson.newMetadata("AnalysisCompleted"),
+                    userId, r.id(), jd.jobId(), jd.source(), r.score(), r.verdict().name(), r.createdAt()));
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public com.referboard.analyzer.web.dto.AnalyzerDtos.AnalysisContext context(UUID userId, UUID id) {
+        JdAnalysis a = find(userId, id);
+        AnalysisReport r = read(a);
+        ResumeContent content = contentJson.read(a.getResumeContent());
+        return new com.referboard.analyzer.web.dto.AnalyzerDtos.AnalysisContext(r.id(), r.job(), r.parsedJd(),
+                r.matchedSkills(), r.missingSkills(),
+                com.referboard.analyzer.suggest.SuggestionEngine.yearsText(scorer.years(content)), content);
     }
 
     @Transactional(readOnly = true)
