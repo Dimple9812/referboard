@@ -1,0 +1,200 @@
+# Production overrides for one server (sized for Oracle Cloud's Always Free Ampere A1: 2 OCPU, 12 GB).
+# Used on top of the main file; deploy/rb wraps this:
+#   docker compose -f docker-compose.yml -f deploy/compose.prod.yml up -d
+#
+# What changes from local development:
+# - Only Caddy is reachable from outside (80/443, automatic HTTPS). Every other port is unpublished.
+# - Java images come from jars built once by deploy/setup.sh (docker/service.prebuilt.Dockerfile).
+# - Memory caps per container, measured with every service running the end-to-end suite (about 4 GB in
+#   total for the 13 JVMs at peak); the caps leave about 40% headroom each.
+# - Real database passwords (deploy/postgres/02-set-passwords.sh), no Mailpit, no sample jobs, log rotation,
+#   and restart on failure or reboot.
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
+x-java: &java
+  restart: unless-stopped
+  logging: *logging
+  mem_limit: 448m
+  ports: !reset []
+
+# Shared JVM flags (JAVA_TOOL_OPTIONS, read by the JVM itself); heap size is per service in JAVA_OPTS.
+# C1-only JIT and the serial collector: less memory and CPU on 2 cores, ample for this traffic.
+x-jvm-base: &jvm-base "-Xss512k -XX:+UseSerialGC -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=48m -XX:TieredStopAtLevel=1 -XX:MaxDirectMemorySize=64m -XX:+ExitOnOutOfMemoryError"
+
+x-prebuilt: &prebuilt
+  context: .
+  dockerfile: docker/service.prebuilt.Dockerfile
+
+services:
+
+  # ---------- edge ----------
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 128m
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [frontend]
+
+  frontend:
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 128m
+    ports: !reset []
+    volumes:
+      # Take the client address from Caddy's X-Forwarded-For, so rate limits see real users, not Caddy.
+      - ./deploy/nginx-real-ip.conf:/etc/nginx/conf.d/00-real-ip.conf:ro
+
+  # ---------- infrastructure ----------
+  postgres:
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 1536m
+    shm_size: 256m
+    ports: !reset []
+    command: ["postgres", "-c", "shared_buffers=384MB", "-c", "effective_cache_size=1GB", "-c", "work_mem=8MB",
+              "-c", "maintenance_work_mem=128MB", "-c", "max_connections=100"]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?set POSTGRES_ADMIN_PASSWORD in .env}
+      # Read by 02-set-passwords.sh when the database is first created.
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?}
+      PROFILE_DB_PASSWORD: ${PROFILE_DB_PASSWORD:?}
+      JOB_DB_PASSWORD: ${JOB_DB_PASSWORD:?}
+      INGESTION_DB_PASSWORD: ${INGESTION_DB_PASSWORD:?}
+      REFERRAL_DB_PASSWORD: ${REFERRAL_DB_PASSWORD:?}
+      ANALYZER_DB_PASSWORD: ${ANALYZER_DB_PASSWORD:?}
+      TRACKER_DB_PASSWORD: ${TRACKER_DB_PASSWORD:?}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?}
+      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD:?}
+      INTERVIEW_DB_PASSWORD: ${INTERVIEW_DB_PASSWORD:?}
+      ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD:?}
+    volumes:
+      - ./deploy/postgres/02-set-passwords.sh:/docker-entrypoint-initdb.d/02-set-passwords.sh:ro
+
+  redis:
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 256m
+    ports: !reset []
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "160mb", "--maxmemory-policy", "allkeys-lru"]
+
+  kafka:
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 1g
+    ports: !reset []
+    environment:
+      KAFKA_HEAP_OPTS: "-Xms384m -Xmx384m"
+      KAFKA_LOG_RETENTION_HOURS: 336          # two weeks; services keep their own state
+      KAFKA_LOG_SEGMENT_BYTES: 104857600
+
+  mailpit:
+    profiles: ["dev"]                        # local only; set SMTP_* in .env to send real email
+
+  # ---------- platform ----------
+  discovery-server:
+    <<: *java
+    build: { <<: *prebuilt, args: { MODULE: infrastructure/discovery-server } }
+    mem_limit: 320m
+    environment:
+      JAVA_OPTS: "-Xmx192m -Duser.timezone=UTC"
+      JAVA_TOOL_OPTIONS: *jvm-base
+
+  api-gateway:
+    <<: *java
+    build: { <<: *prebuilt, args: { MODULE: infrastructure/api-gateway } }
+    mem_limit: 384m
+    environment:
+      JAVA_OPTS: "-Xmx256m -Duser.timezone=UTC"
+      JAVA_TOOL_OPTIONS: *jvm-base
+      # Browsers send Origin https://<domain>, but behind Caddy the gateway sees plain HTTP from nginx, so it
+      # can't tell the request is same-origin. Allow the site's own origin explicitly.
+      CORS_ALLOWED_ORIGINS: https://${DOMAIN}
+
+  # ---------- services ----------
+  auth-service:
+    <<: *java
+    build: { <<: *prebuilt, args: { MODULE: services/auth-service } }
+    environment: { JAVA_OPTS: "-Xmx256m -Duser.timezone=UTC", JAVA_TOOL_OPTIONS: *jvm-base, DB_POOL_SIZE: 5 }
+
+  profile-service:                          # Tika/PDFBox/POI parse uploads: more heap
+    <<: *java
+    build: { <<: *prebuilt, args: { MODULE: services/profile-service } }
+    mem_limit: 640m
+    environment: { JAVA_OPTS: "-Xmx384m -Duser.timezone=UTC", JAVA_TOOL_OPTIONS: *jvm-base, DB_POOL_SIZE: 5 }
+
+  job-service:
+    <<: *java
+    build: { <<: *prebuilt, args: { MODULE: services/job-service } }
+    environment: { JAVA_OPTS: "-Xmx256m -Duser.timezone=UTC", JAVA_TOOL_OPTIONS: *jvm-base, DB_POOL_SIZE: 6 }
+
+  ingestion-service:
+    <<: *java
+    build: { <<: *prebuilt, args: { MODULE: services/ingestion-service } }
+    environment:
+      JAVA_OPTS: "-Xmx256m -Duser.timezone=UTC"
+      JAVA_TOOL_OPTIONS: *jvm-base
+      DB_POOL_SIZE: 5
+      INGESTION_SAMPLE_DATA: "false"         # never show fictional jobs to real users
+      INGESTION_RUN_ON_STARTUP: ${INGESTION_RUN_ON_STARTUP:-true}
+      INGESTION_USER_AGENT: ReferBoardBot/1.0 (+https://${DOMAIN})
+
+  referral-service:
+    <<: *java
+    build: { <<: *prebuilt, args: { MODULE: services/referral-service } }
+    environment: { JAVA_OPTS: "-Xmx256m -Duser.timezone=UTC", JAVA_TOOL_OPTIONS: *jvm-base, DB_POOL_SIZE: 5 }
+
+  resume-analyzer-service:                  # DOCX/PDF rendering and JD files: more heap
+    <<: *java
+    build: { <<: *prebuilt, args: { MODULE: services/resume-analyzer-service } }
+    mem_limit: 640m
+    environment: { JAVA_OPTS: "-Xmx384m -Duser.timezone=UTC", JAVA_TOOL_OPTIONS: *jvm-base, DB_POOL_SIZE: 5 }
+
+  tracker-service:
+    <<: *java
+    build: { <<: *prebuilt, args: { MODULE: services/tracker-service } }
+    environment: { JAVA_OPTS: "-Xmx256m -Duser.timezone=UTC", JAVA_TOOL_OPTIONS: *jvm-base, DB_POOL_SIZE: 5 }
+
+  notification-service:
+    <<: *java
+    build: { <<: *prebuilt, args: { MODULE: services/notification-service } }
+    environment:
+      JAVA_OPTS: "-Xmx256m -Duser.timezone=UTC"
+      JAVA_TOOL_OPTIONS: *jvm-base
+      DB_POOL_SIZE: 5
+      SMTP_HOST: ${SMTP_HOST:-}              # empty: emails are stored as skipped, not sent
+      APP_BASE_URL: https://${DOMAIN}
+      PUBLIC_API_BASE_URL: https://${DOMAIN}
+    depends_on: !override
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+
+  billing-service:
+    <<: *java
+    build: { <<: *prebuilt, args: { MODULE: services/billing-service } }
+    environment: { JAVA_OPTS: "-Xmx256m -Duser.timezone=UTC", JAVA_TOOL_OPTIONS: *jvm-base, DB_POOL_SIZE: 5 }
+
+  interview-service:
+    <<: *java
+    build: { <<: *prebuilt, args: { MODULE: services/interview-service } }
+    environment: { JAVA_OPTS: "-Xmx256m -Duser.timezone=UTC", JAVA_TOOL_OPTIONS: *jvm-base, DB_POOL_SIZE: 5 }
+
+  analytics-service:
+    <<: *java
+    build: { <<: *prebuilt, args: { MODULE: services/analytics-service } }
+    environment: { JAVA_OPTS: "-Xmx256m -Duser.timezone=UTC", JAVA_TOOL_OPTIONS: *jvm-base, DB_POOL_SIZE: 5 }
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,8 @@
+# Build context for the Java images is the repo root; they only need the poms, sources and built jars.
+.git
+.env
+.env.*
+**/node_modules
+frontend
+extension
+docs

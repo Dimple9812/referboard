@@ -4,6 +4,7 @@ Referral-first job search for India and remote tech roles: find relevant jobs, s
 referred instead of applying cold. ReferBoard drafts outreach; **you** always send it yourself.
 
 - Architecture, schemas and event contracts: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- Deploying for free on Oracle Cloud: [`docs/DEPLOY-ORACLE.md`](docs/DEPLOY-ORACLE.md)
 - Stack: Java 21, Spring Boot 3.5, Spring Cloud 2025.0 (Gateway, Eureka), PostgreSQL 16 + pgvector, Kafka,
   Redis, React 18 + TypeScript + Vite.
 
@@ -468,6 +469,11 @@ update auth.users set role = 'ADMIN' where email = 'you@example.com';
 ```
 
 ## Deployment notes
+
+**Free hosting on one Oracle Cloud Always Free server:** step-by-step guide in
+[`docs/DEPLOY-ORACLE.md`](docs/DEPLOY-ORACLE.md); `sudo bash deploy/setup.sh <domain> <email>` does the server side
+(HTTPS, generated secrets, memory limits sized for 12 GB, nightly backups).
+
 
 - Build images with `docker/service.Dockerfile` (`--build-arg MODULE=services/<name>`); images run as non-root,
   in UTC, with layered jars.

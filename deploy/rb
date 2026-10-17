@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# docker compose with the production overrides. Examples:
+#   ./deploy/rb ps                       what's running
+#   ./deploy/rb logs -f --tail=100 auth-service
+#   ./deploy/rb up -d                    apply .env changes
+#   ./deploy/rb restart job-service
+#   ./deploy/rb exec postgres psql -U postgres referboard
+set -euo pipefail
+cd "$(dirname "$0")/.."
+SUDO=""
+if [ "$(id -u)" -ne 0 ] && ! docker info >/dev/null 2>&1; then SUDO="sudo"; fi
+exec $SUDO docker compose -f docker-compose.yml -f deploy/compose.prod.yml "$@"
