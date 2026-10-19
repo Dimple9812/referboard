@@ -1,5 +1,5 @@
 import axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios';
-import type { ApiErrorBody, AuthResponse } from './types';
+import type { DemoStatus, ApiErrorBody, AuthResponse } from './types';
 
 /**
  * The access token lives only in memory (never localStorage: XSS can't lift it from storage). The refresh token
@@ -103,4 +103,7 @@ export const authApi = {
   google: (idToken: string) => bare.post<AuthResponse>('/api/auth/google', { idToken }).then((r) => r.data),
   refresh: refreshSession,
   logout: () => bare.post('/api/auth/logout').then(() => undefined),
+  /** Whether this ReferBoard offers one-click sign-in to a shared demo account (a public showcase). */
+  demoStatus: () => bare.get<DemoStatus>('/api/auth/demo').then((r) => r.data),
+  demo: () => bare.post<AuthResponse>('/api/auth/demo').then((r) => r.data),
 };

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { authApi, session } from '@/api/client';
-import type { AuthResponse, User } from '@/api/types';
+import type { AuthResponse, DemoStatus, User } from '@/api/types';
 
 type Status = 'loading' | 'authenticated' | 'anonymous';
 
@@ -12,6 +12,11 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   signup: (fullName: string, email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  /** One-click sign-in to the shared demo account, when this ReferBoard offers one. */
+  loginDemo: () => Promise<void>;
+  demoAvailable: boolean;
+  /** Signed in as the shared demo account. */
+  isDemo: boolean;
   logout: () => Promise<void>;
   /** Fetches a fresh access token and user (e.g. after buying Pro, so the new role and plan apply now). */
   reload: () => Promise<User>;
@@ -22,7 +27,12 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>('loading');
   const [user, setUser] = useState<User | null>(null);
+  const [demo, setDemo] = useState<DemoStatus>({ enabled: false, email: null });
   const qc = useQueryClient();
+
+  useEffect(() => {
+    authApi.demoStatus().then(setDemo).catch(() => undefined);   // older backends: no demo
+  }, []);
 
   const accept = useCallback((r: AuthResponse) => {
     session.set(r.accessToken);
@@ -57,6 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login: async (email, password) => accept(await authApi.login({ email, password })),
     signup: async (fullName, email, password) => accept(await authApi.signup({ fullName, email, password })),
     loginWithGoogle: async (idToken) => accept(await authApi.google(idToken)),
+    loginDemo: async () => accept(await authApi.demo()),
+    demoAvailable: demo.enabled,
+    isDemo: !!user && !!demo.email && user.email.toLowerCase() === demo.email.toLowerCase(),
     logout: async () => {
       await authApi.logout().catch(() => undefined);
       clear();
@@ -66,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accept(r);
       return r.user;
     },
-  }), [status, user, accept, clear]);
+  }), [status, user, demo, accept, clear]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

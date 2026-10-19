@@ -161,11 +161,12 @@ sudo bash deploy/rb up -d          # restarts only the services whose settings c
 
 | Feature | What to do |
 |---|---|
-| **Payments (Razorpay)** | 1. In the Razorpay Dashboard, get **test** API keys and set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`. <br>2. Under **Webhooks**, add `https://yourdomain.in/api/billing/webhooks/razorpay` with events `payment.captured`, `order.paid` and `payment.refunded`, choose a secret, and put the same value in `RAZORPAY_WEBHOOK_SECRET`. <br>3. Buy Pro on your site with a Razorpay test card. <br>4. To take real money, complete Razorpay's KYC. Activation needs privacy, terms, refund and contact pages on your site. Then swap in the live keys and add a webhook in live mode the same way. |
+| **Payments (Razorpay)** | 1. In the Razorpay Dashboard, get **test** API keys and set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`. <br>2. Under **Webhooks**, add `https://yourdomain.in/api/billing/webhooks/razorpay` with events `payment.captured`, `order.paid` and `refund.processed`, choose a secret, and put the same value in `RAZORPAY_WEBHOOK_SECRET`. <br>3. Buy Pro on your site with a Razorpay test card. <br>4. To take real money, complete Razorpay's KYC. Activation needs privacy, terms, refund and contact pages on your site. Then swap in the live keys and add a webhook in live mode the same way. |
 | **Google sign-in** | In Google Cloud Console, set up the OAuth consent screen, then create an **OAuth client ID** of type Web application, with authorised JavaScript origin `https://yourdomain.in`. Put it in `GOOGLE_CLIENT_ID`, then run `sudo bash deploy/update.sh`. The web app has the ID built in, so it needs a rebuild, not just a restart. |
 | **AI** | Set `ANTHROPIC_API_KEY` and/or `OPENAI_API_KEY`. Without them the app still works, with simpler resume parsing and template drafts. |
 | **Email** | Any SMTP relay. For example, Brevo's free plan: `SMTP_HOST=smtp-relay.brevo.com`, plus your SMTP login in `SMTP_USERNAME` and `SMTP_PASSWORD`. Use a `MAIL_FROM` address on a domain you've verified with the provider. Without `SMTP_HOST`, emails are recorded but not sent. |
 | **More jobs** | Free Adzuna API keys (developer.adzuna.com) in `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`. Company career boards are read on a schedule regardless. |
+| **Demo for visitors** | Lets recruiters look around without signing up: a **Try the demo** button on the home and sign-in pages opens one shared account filled with fictional data. <br>1. Set `DEMO_ACCOUNT_EMAIL` to an address nobody uses, such as `demo@referboard.example`, and run `sudo bash deploy/rb up -d auth-service`. <br>2. Run `sudo bash deploy/seed-demo.sh`. It creates the account with a password nobody knows and adds a sample profile, tracked jobs and referral contacts. If the site has no job listings yet, run it again after the first import to add the contacts. <br>Everyone in the demo shares the same data and a banner tells them so. Never make the demo account an admin; demo sign-in refuses admin accounts. To turn it off, empty `DEMO_ACCOUNT_EMAIL` and run step 1's command again. |
 
 ## Day-to-day commands
 
@@ -292,6 +293,7 @@ tables. This restore was tested that way. The database accounts already exist on
 | `deploy/nginx-real-ip.conf` | Makes rate limits see each visitor's real address behind Caddy |
 | `deploy/postgres/02-set-passwords.sh` | Sets the database accounts' passwords from `.env` when the database is first created |
 | `deploy/backup.sh`, `deploy/update.sh` | Backups and updates |
+| `deploy/seed-demo.sh` | Creates and fills the optional shared demo account |
 | `deploy/env.template` | The template `.env` is made from |
 
 **Memory budget** (12 GB server):

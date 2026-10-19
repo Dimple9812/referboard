@@ -5,6 +5,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { useUnreadCount } from '@/api/queries';
 import { cn } from '@/lib/cn';
 import { Logo } from './Logo';
+import { DemoBanner } from './Demo';
 
 const NAV: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/jobs', label: 'Jobs', icon: Briefcase },
@@ -25,7 +26,7 @@ export function AppLayout() {
   const unread = useUnreadCount().data ?? 0;
   const more = user?.role === 'ADMIN' ? [...MORE, { to: '/admin', label: 'Admin', icon: Gauge }] : MORE;
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[15rem_1fr]">
+    <div className="min-h-screen lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2">
         Skip to content
       </a>
@@ -75,7 +76,7 @@ export function AppLayout() {
       </header>
 
       <main id="main" className="px-4 pb-28 pt-6 sm:px-8 lg:px-12 lg:pb-16 lg:pt-10">
-        <div className="mx-auto max-w-content"><Outlet /></div>
+        <div className="mx-auto max-w-content"><DemoBanner /><Outlet /></div>
       </main>
 
       {/* Mobile tab bar */}

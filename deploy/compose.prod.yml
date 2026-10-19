@@ -125,7 +125,11 @@ services:
   auth-service:
     <<: *java
     build: { <<: *prebuilt, args: { MODULE: services/auth-service } }
-    environment: { JAVA_OPTS: "-Xmx256m -Duser.timezone=UTC", JAVA_TOOL_OPTIONS: *jvm-base, DB_POOL_SIZE: 5 }
+    environment:
+      JAVA_OPTS: "-Xmx256m -Duser.timezone=UTC"
+      JAVA_TOOL_OPTIONS: *jvm-base
+      DB_POOL_SIZE: 5
+      DEMO_ACCOUNT_EMAIL: ${DEMO_ACCOUNT_EMAIL:-}   # empty = no "Try the demo" button
 
   profile-service:                          # Tika/PDFBox/POI parse uploads: more heap
     <<: *java

@@ -6,6 +6,7 @@ import { errorMessage } from '@/api/client';
 import { Button } from '@/components/ui/Button';
 import { Field, Input } from '@/components/ui/Field';
 import { Logo } from '@/components/Logo';
+import { TryDemoButton } from '@/components/Demo';
 
 function AuthShell({ title, children, footer }: { title: string; children: React.ReactNode; footer: React.ReactNode }) {
   return (
@@ -16,6 +17,18 @@ function AuthShell({ title, children, footer }: { title: string; children: React
         <div className="mt-6">{children}</div>
         <p className="mt-8 text-sm text-slate">{footer}</p>
       </div>
+    </div>
+  );
+}
+
+/** "Just looking?" with a demo button, only on deployments that offer a demo. */
+function DemoHint() {
+  const { demoAvailable } = useAuth();
+  if (!demoAvailable) return null;
+  return (
+    <div className="mt-6 flex items-center justify-between gap-3 border-t border-line pt-5 text-sm text-ink-soft">
+      <span>Just looking around?</span>
+      <TryDemoButton size="sm" />
     </div>
   );
 }
@@ -61,6 +74,7 @@ export function LoginPage() {
         <Button type="submit" className="w-full" loading={busy}>Sign in</Button>
       </form>
       <div className="mt-6"><GoogleButton onCredential={google} /></div>
+      <DemoHint />
     </AuthShell>
   );
 }

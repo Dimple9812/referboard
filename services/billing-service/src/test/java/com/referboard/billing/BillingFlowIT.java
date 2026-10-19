@@ -262,12 +262,15 @@ class BillingFlowIT {
     @Test
     @Order(5)
     void aFullRefundTakesBackThatOrdersDaysOnly() throws Exception {
-        String partial = MAPPER.writeValueAsString(Map.of("event", "payment.refunded", "payload", Map.of("payment",
-                Map.of("entity", Map.of("id", "pay_2", "amount", 249900, "amount_refunded", 10000, "refund_status", "partial")))));
+        // Razorpay's refund.processed carries the payment (with its refund totals) and the refund itself.
+        String partial = MAPPER.writeValueAsString(Map.of("event", "refund.processed", "payload", Map.of(
+                "payment", Map.of("entity", Map.of("id", "pay_2", "amount", 249900, "amount_refunded", 10000,
+                        "refund_status", "partial")),
+                "refund", Map.of("entity", Map.of("id", "rfnd_1", "payment_id", "pay_2", "amount", 10000)))));
         assertThat(json(webhook(partial, RazorpaySignatures.hmac(partial.getBytes(StandardCharsets.UTF_8), WEBHOOK_SECRET),
                 "evt_4"), 200).get("result").asText()).isEqualTo("IGNORED");
 
-        String full = partial.replace("10000", "249900").replace("partial", "full");
+        String full = partial.replace("10000", "249900").replace("partial", "full").replace("rfnd_1", "rfnd_2");
         assertThat(json(webhook(full, RazorpaySignatures.hmac(full.getBytes(StandardCharsets.UTF_8), WEBHOOK_SECRET),
                 "evt_5"), 200).get("result").asText()).isEqualTo("APPLIED");
         JsonNode status = json(get("/api/billing/me", TOKEN), 200);
