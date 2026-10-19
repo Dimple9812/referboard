@@ -74,7 +74,7 @@ public class WebhookService {
                     }
                     yield ours ? Outcome.APPLIED : Outcome.IGNORED;
                 }
-                case "payment.refunded" -> {
+                case "payment.refunded", "refund.processed" -> {   // refund.processed is what Razorpay sends today
                     boolean full = "full".equals(payment.path("refund_status").asText())
                             || payment.path("amount_refunded").asLong() >= payment.path("amount").asLong(Long.MAX_VALUE);
                     if (!full) {

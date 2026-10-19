@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/Logo';
+import { TryDemoButton } from '@/components/Demo';
 import { ReferralThread } from '@/components/ReferralThread';
 
 const STEPS = [
@@ -33,6 +34,7 @@ export function LandingPage() {
             <div className="mt-8 flex flex-wrap gap-3">
               <Button size="lg" asChild><Link to="/signup">Create a free account</Link></Button>
               <Button size="lg" variant="outline" asChild><Link to="/login">Sign in</Link></Button>
+              <TryDemoButton variant="ghost" />
             </div>
           </div>
 

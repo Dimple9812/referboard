@@ -22,6 +22,10 @@ export interface User {
   plan?: 'PRO' | 'FREE';
   proUntil?: string | null;
 }
+export interface DemoStatus {
+  enabled: boolean;
+  email: string | null;
+}
 export interface AuthResponse {
   accessToken: string;
   tokenType: string;

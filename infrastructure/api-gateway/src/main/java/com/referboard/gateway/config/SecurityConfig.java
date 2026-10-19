@@ -35,9 +35,9 @@ public class SecurityConfig {
 
     /** Reachable without a token. Everything else under /api requires one. */
     static final String[] PUBLIC_POST = {"/api/auth/signup", "/api/auth/login", "/api/auth/google",
-            "/api/auth/refresh", "/api/auth/logout", "/api/auth/extension/refresh", "/api/auth/extension/disconnect",
+            "/api/auth/refresh", "/api/auth/logout", "/api/auth/demo", "/api/auth/extension/refresh", "/api/auth/extension/disconnect",
             "/api/billing/webhooks/razorpay"};
-    static final String[] PUBLIC_ANY = {"/api/notifications/unsubscribe", "/api/billing/plans", "/.well-known/jwks.json",
+    static final String[] PUBLIC_ANY = {"/api/auth/demo", "/api/notifications/unsubscribe", "/api/billing/plans", "/.well-known/jwks.json",
             "/actuator/health/**", "/actuator/info", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**",
             "/webjars/**"};
 

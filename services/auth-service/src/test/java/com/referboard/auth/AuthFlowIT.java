@@ -45,7 +45,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "eureka.client.enabled=false",
         "referboard.outbox.poll-interval-ms=200",
         "referboard.auth.refresh-cookie.secure=false",
-        "referboard.auth.jwt.key-dir=target/it-keys"
+        "referboard.auth.jwt.key-dir=target/it-keys",
+        "referboard.demo.account-email=Demo-IT@example.com"
 })
 @EmbeddedKafka(partitions = 1, topics = {Topics.USER_REGISTERED, Topics.PRO_STATUS_CHANGED}, kraft = true,
         bootstrapServersProperty = "spring.kafka.bootstrap-servers")
@@ -139,6 +140,42 @@ class AuthFlowIT {
         assertThat(event.fullName()).isEqualTo("Asha Rao");
         assertThat(event.authProvider()).isEqualTo("LOCAL");
         assertThat(event.metadata().producer()).isEqualTo("auth-service");
+    }
+
+    @Test
+    void demoSignInUsesTheConfiguredAccountWithoutAPasswordButNeverAnAdmin() throws Exception {
+        // configured but the account doesn't exist yet: reported as not available, sign-in refused
+        assertThat(mapper.readTree(get("/api/auth/demo", null).getBody()).get("enabled").asBoolean()).isFalse();
+        ResponseEntity<String> early = post("/api/auth/demo", null, null);
+        assertThat(early.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(early.getBody()).contains("DEMO_NOT_READY");
+
+        post("/api/auth/signup", Map.of("email", "demo-it@example.com", "password", "Passw0rdOK",
+                "fullName", "Demo Candidate"), null);
+        JsonNode status = mapper.readTree(get("/api/auth/demo", null).getBody());
+        assertThat(status.get("enabled").asBoolean()).isTrue();
+        assertThat(status.get("email").asText()).isEqualTo("demo-it@example.com");
+
+        // no password needed; a normal session (cookie + access token) for that account
+        ResponseEntity<String> demo = post("/api/auth/demo", null, null);
+        assertThat(demo.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String access = mapper.readTree(demo.getBody()).get("accessToken").asText();
+        assertThat(mapper.readTree(get("/api/auth/me", access).getBody()).get("email").asText())
+                .isEqualTo("demo-it@example.com");
+        assertThat(post("/api/auth/refresh", null, refreshCookie(demo)).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // each visitor gets an independent session: one signing out doesn't end another's
+        String visitor2 = refreshCookie(post("/api/auth/demo", null, null));
+        String visitor3 = refreshCookie(post("/api/auth/demo", null, null));
+        post("/api/auth/logout", null, visitor2);
+        assertThat(post("/api/auth/refresh", null, visitor3).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // a misconfigured admin account is never handed out
+        jdbc.update("update users set role = 'ADMIN' where email = 'demo-it@example.com'");
+        ResponseEntity<String> admin = post("/api/auth/demo", null, null);
+        assertThat(admin.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(admin.getBody()).contains("DEMO_UNAVAILABLE");
+        jdbc.update("update users set role = 'USER' where email = 'demo-it@example.com'");
     }
 
     @Test

@@ -45,7 +45,7 @@ flowchart LR
 | interview-service (Phase 3) | ✅ | 8 unit + 4 integration (question bank, evidence only from resume bullets, AI questions with a bad index dropped, free-tier limit, practice with optimistic locking) |
 | analytics-service (Phase 3) | ✅ | 1 integration (all 7 topics, out of order and redelivered, IST weeks, minimum sample before a rate) |
 | api-gateway | ✅ | 5 unit + 9 integration (edge JWT via JWKS, CORS, Redis token buckets, fail-open, JSON errors, docs aggregation) |
-| frontend | ✅ | 17 unit (token refresh, board moves, formatting, Razorpay checkout outcomes) + Playwright smoke and Phase 3 journeys (buy Pro, prep and practise, insights) on desktop and mobile against the live stack |
+| frontend | ✅ | 20 unit (token refresh, board moves, formatting, Razorpay checkout outcomes, demo button and banner) + Playwright smoke and Phase 3 journeys (buy Pro, prep and practise, insights) on desktop and mobile against the live stack |
 | extension (Phase 2) | ✅ | 21 unit (site rules, page reading, session refresh, popup) + Playwright with the extension loaded in Chromium |
 
 ## Run locally with Docker
@@ -366,7 +366,7 @@ wallets). Nothing auto-renews, so there's no mandate to manage and nothing to ca
    (HMAC-SHA256 of `order_id|payment_id` with the key secret), fetches the payment from Razorpay, captures it if
    only authorised, and marks the order paid.
 3. Razorpay's webhook (`POST /api/billing/webhooks/razorpay`; `payment.captured`, `order.paid`,
-   `payment.refunded`) does the same independently, so a closed tab never loses a payment. It checks
+   `refund.processed`) does the same independently, so a closed tab never loses a payment. It checks
    `X-Razorpay-Signature` over the raw body and ignores repeated `X-Razorpay-Event-Id`s.
 4. Paying extends Pro from whichever is later, now or the current end date. A full refund takes that order's days
    back off; a partial refund changes nothing. Each change publishes `billing.pro-status-changed.v1`.
@@ -474,6 +474,8 @@ update auth.users set role = 'ADMIN' where email = 'you@example.com';
 [`docs/DEPLOY-ORACLE.md`](docs/DEPLOY-ORACLE.md); `sudo bash deploy/setup.sh <domain> <email>` does the server side
 (HTTPS, generated secrets, memory limits sized for 12 GB, nightly backups).
 
+**Demo for visitors (optional):** set `DEMO_ACCOUNT_EMAIL` and run `deploy/seed-demo.sh` to add a **Try the demo**
+button that opens one shared account with fictional data, so recruiters can look around without signing up.
 
 - Build images with `docker/service.Dockerfile` (`--build-arg MODULE=services/<name>`); images run as non-root,
   in UTC, with layered jars.
