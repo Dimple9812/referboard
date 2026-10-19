@@ -74,6 +74,9 @@ referboard:
     lockout:
       max-failed-attempts: 5
       duration: PT15M
+  # One-click sign-in to a shared demo account (a showcase deployment). Empty = off.
+  demo:
+    account-email: ${DEMO_ACCOUNT_EMAIL:}
 
 springdoc:
   api-docs:

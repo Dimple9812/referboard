@@ -20,10 +20,10 @@ public class SecurityConfig {
         ResourceServerSecurity.applyDefaults(http, mapper)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(ResourceServerSecurity.PUBLIC_PATHS).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/.well-known/jwks.json").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/.well-known/jwks.json", "/api/auth/demo").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/auth/signup", "/api/auth/login", "/api/auth/google",
-                                "/api/auth/refresh", "/api/auth/logout",
+                                "/api/auth/refresh", "/api/auth/logout", "/api/auth/demo",
                                 "/api/auth/extension/refresh", "/api/auth/extension/disconnect").permitAll()
                         .anyRequest().authenticated());
         return http.build();

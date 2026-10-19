@@ -19,7 +19,7 @@ public final class RateLimitPolicy {
 
     public enum Bucket { AUTH, EXPENSIVE, DEFAULT }
 
-    private static final Pattern AUTH = Pattern.compile("^/api/auth/(login|signup|google)$");
+    private static final Pattern AUTH = Pattern.compile("^/api/auth/(login|signup|google|demo)$");
     private static final Pattern EXPENSIVE = Pattern.compile(
             "^/api/analyses(/upload|/[^/]+/cover-letters)?$|^/api/interview-preps$|^/api/referrals/contacts/[^/]+/drafts$|^/api/profile/resumes(/[^/]+/reparse)?$");
 
